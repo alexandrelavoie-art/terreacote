@@ -1,0 +1,1530 @@
+<!--
+  VALEURS PAR DÉFAUT — MODIFIEZ ICI
+  ─────────────────────────────────────
+  REVENUS
+    prixLot       — Prix de vente d'un lot ($)
+    nbLots        — Nombre de lots au démarrage (9–25)
+    prixDemiLot   — Prix de vente d'un demi-lot ($)
+    nbDemiLots    — Nombre de demi-lots
+    autresRevenus — Autres revenus ($)
+  ACHAT TERRE
+    coutTerre       — Coût d'achat de la terre ($)
+    coutsConnexes   — Coûts connexes à l'achat ($)
+    autresCoutsAchat — Autres coûts d'achat ($)
+  AMÉNAGEMENT
+    arpentage     — Coût d'arpentage ($)
+    biologiste    — Honoraires du biologiste ($)
+    autresCoutsAmenagement — Autres coûts d'aménagement ($)
+  CHEMIN
+    chemin        — Coût visé pour le chemin ($)
+  AUTRES COÛTS
+    autresCouts   — Autres coûts divers ($)
+  PARTAGE DES EXCÉDENTS (doit totaliser 100 %)
+    partFRICHE      — Part versée au FRICH (%)
+    partAssociation — Part versée à l'association (%)
+-->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculateur de budget — Lotissement</title>
+    <script>
+    const DEFAULTS = {
+        prixLot       : 40000,
+        nbLots        : 18,
+        prixDemiLot   : 20000,
+        nbDemiLots    : 2,
+        autresRevenus : 0,
+        coutTerre              : 370000,
+        arpentage              : 10000,
+        biologiste             : 5500,
+        autresCoutsAmenagement : 0,
+        chemin      : 60000,
+        autresCouts : 0,
+        partFRICHE      : 75,
+        partAssociation : 25,
+    };
+    // URL params override defaults
+    const CONFIG = (() => {
+        const p = new URLSearchParams(window.location.search);
+        const c = { ...DEFAULTS };
+        for (const key of Object.keys(DEFAULTS)) {
+            if (p.has(key)) c[key] = Number(p.get(key));
+        }
+        return c;
+    })();
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f0f2f5;
+            padding: .75rem 1rem;
+            line-height: 1.4;
+            color: #1a1a1a;
+        }
+        .container { max-width: 1280px; margin: 0 auto; }
+        h1 { font-size: 20px; font-weight: 700; margin-bottom: 0.1rem; }
+        .subtitle { font-size: 14px; color: #666; margin-bottom: .6rem; }
+
+        /* —— Main layout —— */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 330px;
+            gap: .75rem;
+            align-items: start;
+        }
+
+        /* —— FIL D'ARIANE —— */
+        .breadcrumb {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 0;
+            position: relative;
+        }
+        .breadcrumb::before {
+            content: '';
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            right: 14px;
+            height: 2px;
+            background: #e2e8f0;
+            z-index: 0;
+        }
+        .bc-step {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+            position: relative;
+            z-index: 1;
+        }
+        .bc-node {
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            border: 2px solid #e2e8f0;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: border-color .3s, background .3s, box-shadow .3s;
+            box-shadow: 0 1px 3px rgba(0,0,0,.1);
+        }
+        .bc-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-align: center;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            line-height: 1.2;
+            max-width: 60px;
+            transition: color .3s;
+        }
+        .bc-step::after {
+            content: '';
+            position: absolute;
+            top: 14px;
+            left: calc(50% + 14px);
+            right: calc(-50% + 14px);
+            height: 2px;
+            background: #e2e8f0;
+            z-index: -1;
+            transition: background .3s;
+        }
+        .bc-step:last-child::after { display: none; }
+
+        /* —tats */
+        .bc-step.ok   .bc-node  { border-color: #16a34a; background: #16a34a; color: white; box-shadow: 0 0 0 3px #dcfce7; }
+        .bc-step.ok   .bc-label { color: #16a34a; }
+        .bc-step.ok::after       { background: #86efac; }
+        .bc-step.danger .bc-node { border-color: #dc2626; background: #dc2626; color: white; box-shadow: 0 0 0 3px #fee2e2; }
+        .bc-step.danger .bc-label { color: #dc2626; }
+        .bc-step.active .bc-node { border-color: #378ADD; background: #eff6ff; color: #1d4ed8; box-shadow: 0 0 0 3px #dbeafe; }
+        .bc-step.active .bc-label { color: #378ADD; }
+
+        .bc-amount {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 1px 5px;
+            border-radius: 8px;
+            white-space: nowrap;
+            background: #f1f5f9;
+            color: #94a3b8;
+            transition: background .3s, color .3s;
+        }
+        .bc-step.ok     .bc-amount { background: #dcfce7; color: #15803d; }
+        .bc-step.danger .bc-amount { background: #fee2e2; color: #b91c1c; }
+        .bc-step.active .bc-amount { background: #dbeafe; color: #1d4ed8; }
+
+        /* 3-col jalon grid with connectors */
+        .jalon-group-grid {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr auto 1fr;
+            gap: 0;
+            align-items: stretch;
+        }
+        .jalon-connector {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 .25rem;
+            color: #cbd5e1;
+            font-size: 16px;
+            padding-top: 1.2rem;
+        }
+
+        /* —— SECTIONS GRILLE —— */
+        .sections-col {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .5rem;
+            align-items: start;
+        }
+
+        /* —— Section card —— */
+        .section-card {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,.07);
+            border-left: 3px solid #e2e8f0;
+            transition: border-color .3s, background .3s;
+        }
+        .section-card.s-ok     { border-left-color: #16a34a; background: white; }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: .28rem .65rem;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+        .step-num {
+            width: 20px; height: 20px;
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: 800;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            background: #e2e8f0; color: #64748b;
+            transition: background .3s, color .3s;
+        }
+        .s-ok    .step-num { background: #16a34a; color: white; }
+        .s-danger .step-num { background: #dc2626; color: white; }
+        .s-active .step-num { background: #378ADD; color: white; }
+
+        .section-card.s-ok     { border-left-color: #16a34a; background: white; }
+        .section-card.s-danger { border-left-color: #dc2626; background: #fef2f2; }
+        .section-card.s-active { border-left-color: #378ADD; background: #f0f8ff; }
+
+        .status-dot {
+            display: flex; align-items: center; justify-content: center;
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            font-size: 11px; font-weight: 700;
+            flex-shrink: 0; margin-left: auto;
+            transition: background .3s, color .3s;
+            background: #e2e8f0; color: #94a3b8;
+        }
+        .status-dot.ok     { background: #16a34a; color: white; }
+        .status-dot.danger { background: #dc2626; color: white; }
+        .status-dot.active { background: #378ADD; color: white; }
+
+        .section-body { padding: .3rem .65rem; }
+
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: .4rem;
+            margin-bottom: .22rem;
+        }
+        .input-row:last-child { margin-bottom: 0; }
+        .input-row label { flex: 1; font-size: 13px; color: #555; min-width: 0; }
+        .field-pair { display: flex; align-items: center; gap: 3px; }
+
+        input[type="number"] {
+            width: 82px;
+            padding: 3px 6px;
+            border: 1px solid #d5d5d5;
+            border-radius: 5px;
+            font-size: 13px;
+            font-family: inherit;
+            text-align: right;
+            background: #fafafa;
+        }
+        input[type="number"].narrow { width: 50px; }
+        input[type="number"]:focus {
+            outline: none; border-color: #378ADD; background: white;
+            box-shadow: 0 0 0 2px rgba(55,138,221,.15);
+        }
+        .unit { font-size: 11px; color: #aaa; min-width: 10px; }
+
+        /* —— Bilan —— */
+        .section-bilan {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: .22rem .65rem;
+            border-top: 1px solid rgba(0,0,0,.06);
+            font-size: 12px;
+            gap: .4rem;
+        }
+        .bilan-label { font-weight: 600; color: #555; font-size: 12px; }
+        .bilan-right { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; justify-content: flex-end; }
+        .bilan-amount { font-size: 14px; font-weight: 700; }
+
+        .seuil-badge {
+            font-size: 12px; font-weight: 800;
+            padding: 2px 8px; border-radius: 20px;
+            white-space: nowrap; background: #e2e8f0; color: #1e293b;
+            letter-spacing: .02em;
+        }
+        .seuil-impossible { background: #fee2e2; color: #b91c1c; }
+        .seuil-ok         { background: #dcfce7; color: #15803d; }
+
+        .jalon-info {
+            font-size: 12px; font-weight: 600;
+            padding: 1px 6px; border-radius: 5px; white-space: nowrap;
+        }
+        .jalon-ok     { background: #dcfce7; color: #15803d; }
+        .jalon-manque { background: #fee2e2; color: #b91c1c; }
+        .jalon-neutre { background: #f1f5f9; color: #64748b; }
+
+        .sub-header {
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .04em; color: #94a3b8;
+            padding: .18rem .65rem .05rem;
+            border-top: 1px dashed #e2e8f0;
+        }
+
+        .partage-warning {
+            font-size: 11px; color: #b45309;
+            background: #fef3c7; border-radius: 4px;
+            padding: 2px 6px; margin-top: 3px; display: none;
+        }
+
+        /* —— Right column —— */
+        .right-col {
+            display: flex; flex-direction: column; gap: .6rem;
+            position: sticky; top: .75rem;
+        }
+        .panel-card {
+            background: white; border-radius: 8px;
+            padding: .6rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,.07);
+        }
+        .panel-title {
+            font-size: 11px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: .05em;
+            color: #888; margin-bottom: .5rem;
+            padding-bottom: .3rem; border-bottom: 1px solid #f0f0f0;
+        }
+
+        /* Slider */
+        .slider-row { display: flex; align-items: center; gap: 8px; }
+        .slider-row label { font-size: 13px; color: #555; white-space: nowrap; }
+        input[type="range"] {
+            flex: 1; height: 3px; background: #e0e0e0;
+            border-radius: 2px; outline: none; -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px; height: 14px; border-radius: 50%;
+            background: #378ADD; cursor: pointer;
+            border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,.25);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 14px; height: 14px; border-radius: 50%;
+            background: #378ADD; cursor: pointer; border: 2px solid white;
+        }
+        input[type="number"].lot-num { width: 50px; text-align: center; }
+
+        /* Progress bar */
+        .progress-header {
+            display: flex; justify-content: space-between;
+            align-items: baseline; margin-bottom: 4px; font-size: 12px;
+        }
+        .progress-header span:first-child { font-weight: 600; color: #444; }
+        .progress-header span:last-child  { color: #888; font-size: 11px; }
+        .progress-outer {
+            width: 100%; height: 9px;
+            background: #e5e7eb; border-radius: 5px; overflow: hidden;
+        }
+        .progress-inner {
+            height: 100%; border-radius: 5px;
+            transition: width .35s ease, background .35s ease; max-width: 100%;
+        }
+        .progress-sublabels {
+            display: flex; justify-content: space-between;
+            font-size: 10px; color: #bbb; margin-top: 2px;
+        }
+        .status-tag {
+            display: inline-block; font-size: 11px; font-weight: 600;
+            padding: 2px 7px; border-radius: 4px; margin-top: 4px;
+        }
+        .tag-ok     { background: #dcfce7; color: #15803d; }
+        .tag-warn   { background: #fef3c7; color: #b45309; }
+        .tag-danger { background: #fee2e2; color: #b91c1c; }
+
+        /* Donut */
+        .donut-title {
+            font-size: 11px; font-weight: 600; color: #555;
+            text-align: center; text-transform: uppercase;
+            letter-spacing: .04em; margin-bottom: .35rem;
+        }
+        .donut-wrapper { position: relative; width: 100%; height: 185px; }
+        /* —— Surplus split dans le fil d'ariane —— */
+        .bcv-split {
+            display: flex;
+            gap: .4rem;
+            margin-top: 2px;
+        }
+        .bcv-split-cell { display: flex; flex-direction: column; gap: 2px; }
+        .bcv-split-label { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
+
+        .bcv-step.ok   .bcv-split-label { color: #16a34a; }
+        .bcv-step.danger .bcv-split-label { color: #dc2626; }
+
+        .donut-center {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -75%);
+            text-align: center; pointer-events: none; width: 80px;
+        }
+        .donut-center-pct  { font-size: 20px; font-weight: 700; line-height: 1.1; }
+        .donut-center-label { font-size: 10px; color: #888; line-height: 1.3; }
+
+        /* —— Palette identitaire ————
+           — #84C7D0 (bleu)   — Revenus (section 1) + FRICH
+           —  #C07D1A (orange) — Achat & Aménagement (section 2)
+           — #7E78D2 (jaune)  — Bilan surplus (section 3)
+           — #596F62 (rose)   — Part association (section 4)
+           — Vert             — validation positive + fil d'ariane ok
+           — Rouge            — validation négative + fil d'ariane danger
+        —— */
+        .theme-revenus   .section-header { background: #e8f7f9; color: #1a8a96; }
+        .theme-revenus   .section-bilan  { background: #e8f7f9; }
+        .theme-terre     .section-header { background: #fdf6e3; color: #C07D1A; }
+        .theme-terre     .section-bilan  { background: #fdf6e3; }
+        .theme-amenag    .section-header { background: #fdf6e3; color: #C07D1A; }
+        .theme-amenag    .section-bilan  { background: #fdf6e3; }
+        .theme-partage   .section-header { background: #e8f7f9; color: #1a8a96; }
+        .theme-partage   .section-bilan  { background: #e8f7f9; }
+        .theme-surplus   .section-header { background: #eef0f6; color: #25283D; }
+        .theme-surplus   .section-bilan  { background: #eef0f6; }
+        .theme-chemin    .section-header { background: #f1f4f2; color: #596F62; }
+        .theme-chemin    .section-bilan  { background: #f1f4f2; }
+
+        /* Bilan card: vert si surplus positif, rouge si déficit */
+        .s-ok.theme-surplus     .section-header { background: #dcfce7; color: #15803d; }
+        .s-ok.theme-surplus     .section-bilan  { background: #dcfce7; }
+        .s-ok.theme-surplus     .bilan-amount   { color: #15803d; }
+        .s-danger.theme-surplus .section-header { background: #fee2e2; color: #b91c1c; }
+        .s-danger.theme-surplus .section-bilan  { background: #fee2e2; }
+        .s-danger.theme-surplus .bilan-amount   { color: #b91c1c; }
+
+        /* Alerte */
+        #alerteGlobale > div {
+            padding: 7px 10px; border-radius: 6px; font-size: 13px;
+            border-left: 3px solid;
+        }
+
+        .panel-card .breadcrumb { margin-bottom: 0; }
+
+        /* —— Fil d'ariane VERTICAL —— */
+        .breadcrumb-v { display: flex; flex-direction: column; gap: 0; }
+
+        .bcv-step {
+            display: flex;
+            align-items: flex-start;
+            gap: .5rem;
+            position: relative;
+        }
+
+        .bcv-left {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-shrink: 0;
+            width: 26px;
+        }
+
+        .bcv-node {
+            width: 26px; height: 26px;
+            border-radius: 50%;
+            border: 2px solid #e2e8f0;
+            background: white;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px;
+            transition: border-color .3s, background .3s, box-shadow .3s;
+            box-shadow: 0 1px 3px rgba(0,0,0,.08);
+            flex-shrink: 0;
+        }
+
+        .bcv-line {
+            width: 2px;
+            flex: 1;
+            min-height: 14px;
+            background: #e2e8f0;
+            margin: 2px 0;
+            transition: background .3s;
+        }
+
+        .bcv-right {
+            padding: .1rem 0 .6rem;
+        }
+
+        .bcv-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            line-height: 1.2;
+            transition: color .3s;
+        }
+
+        .bcv-amount {
+            font-size: 13px;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 8px;
+            display: inline-block;
+            margin-top: 2px;
+            background: #f1f5f9;
+            color: #94a3b8;
+            transition: background .3s, color .3s;
+        }
+
+        /* —tats verticaux */
+        .bcv-step.ok   .bcv-node   { border-color: #16a34a; background: #16a34a; color: white; box-shadow: 0 0 0 3px #dcfce7; }
+        .bcv-step.ok   .bcv-label  { color: #16a34a; }
+        .bcv-step.ok   .bcv-line   { background: #86efac; }
+        .bcv-step.ok   .bcv-amount { background: #dcfce7; color: #15803d; }
+        .bcv-step.danger .bcv-node   { border-color: #dc2626; background: #dc2626; color: white; box-shadow: 0 0 0 3px #fee2e2; }
+        .bcv-step.danger .bcv-label  { color: #dc2626; }
+        .bcv-step.danger .bcv-amount { background: #fee2e2; color: #b91c1c; }
+
+        /* —— Groupements —— */
+        .section-group {
+            grid-column: 1 / -1;
+            background: #f0fbfc;
+            border: 1.5px solid #84C7D0;
+            border-radius: 10px;
+            padding: .35rem .4rem .4rem;
+        }
+        .section-group-label {
+            font-size: 10px; font-weight: 800;
+            text-transform: uppercase; letter-spacing: .08em;
+            color: #1a8a96; margin-bottom: .3rem; padding-left: .2rem;
+        }
+        .section-group-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .4rem;
+        }
+
+        /* —— Bilan intermédiaire flow —— */
+        .bilan-flow-cell { text-align: center; }
+        .bilan-flow-label { font-size: 12px; color: #888; margin-bottom: 2px; }
+        .bilan-flow-amount { font-size: 15px; font-weight: 700; }
+        .bilan-flow-amount.positive { color: #15803d; }
+        .bilan-flow-amount.neutral  { color: #57534e; }
+        .bilan-flow-op {
+            font-size: 16px; font-weight: 300; color: #94a3b8;
+            text-align: center; padding-top: 1rem;
+        }
+
+        @media (max-width: 900px) {
+            .main-grid { grid-template-columns: 1fr; }
+            .right-col { position: static; }
+        }
+        @media (max-width: 540px) {
+            .sections-col { grid-template-columns: 1fr; }
+            .section-group-grid { grid-template-columns: 1fr; }
+            .breadcrumb .bc-label { display: none; }
+            body { padding: .5rem; }
+            h1 { font-size: 16px; }
+            input[type="number"] { width: 70px; }
+        }
+
+        /* —— Reset button —— */
+        .btn-reset {
+            font-size: 12px; font-weight: 600;
+            padding: 4px 10px; border-radius: 6px;
+            border: 1.5px solid #cbd5e1;
+            background: white; color: #64748b;
+            cursor: pointer; transition: background .2s, border-color .2s, color .2s;
+        }
+        .btn-reset:hover { background: #f1f5f9; border-color: #94a3b8; color: #334155; }
+        /* —— Journal de publication —— */
+        .journal-section {
+            margin-top: 1rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,.07);
+            overflow: hidden;
+        }
+        .journal-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: .5rem .75rem;
+            background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+        }
+        .journal-header h2 {
+            font-size: 13px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .04em; color: #64748b; margin: 0;
+        }
+        .journal-count {
+            font-size: 11px; color: #94a3b8; font-weight: 600;
+            background: #f1f5f9; padding: 1px 8px; border-radius: 10px;
+        }
+        .journal-empty {
+            padding: 1.5rem; text-align: center;
+            font-size: 13px; color: #94a3b8;
+        }
+        .journal-list { list-style: none; margin: 0; padding: 0; }
+        .journal-entry {
+            display: flex; align-items: flex-start; gap: .6rem;
+            padding: .5rem .75rem;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background .15s;
+        }
+        .journal-entry:last-child { border-bottom: none; }
+        .journal-entry:hover { background: #fafbfc; }
+        .journal-entry-body { flex: 1; min-width: 0; }
+        .journal-entry-name {
+            font-size: 13px; font-weight: 700; color: #1a1a1a;
+            border: none; background: transparent; padding: 0; width: 100%;
+            font-family: inherit; outline: none;
+        }
+        .journal-entry-name:hover { background: #f1f5f9; border-radius: 3px; }
+        .journal-entry-name:focus { background: #eff6ff; border-radius: 3px; }
+        .journal-entry-desc {
+            font-size: 12px; color: #64748b;
+            border: none; background: transparent; padding: 0; width: 100%;
+            font-family: inherit; outline: none; margin-top: 2px; resize: none;
+        }
+        .journal-entry-desc:hover { background: #f1f5f9; border-radius: 3px; }
+        .journal-entry-desc:focus { background: #eff6ff; border-radius: 3px; }
+        .journal-entry-meta {
+            font-size: 10px; color: #b0b0b0; margin-top: 3px;
+        }
+        .journal-entry-actions {
+            display: flex; flex-direction: column; gap: 4px;
+            flex-shrink: 0; padding-top: 2px;
+        }
+        .journal-btn {
+            font-size: 11px; padding: 2px 8px; border-radius: 4px;
+            border: 1px solid #e2e8f0; background: white; color: #64748b;
+            cursor: pointer; white-space: nowrap; transition: all .15s;
+        }
+        .journal-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
+        .journal-btn.danger:hover { background: #fef2f2; border-color: #fca5a5; color: #dc2626; }
+
+        /* —— Modale —— */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,.4);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; pointer-events: none;
+            transition: opacity .2s;
+        }
+        .modal-overlay.visible { opacity: 1; pointer-events: auto; }
+        .modal-box {
+            background: white; border-radius: 10px; padding: 1.2rem;
+            width: 380px; max-width: 90vw;
+            box-shadow: 0 10px 40px rgba(0,0,0,.2);
+            transform: translateY(10px); transition: transform .2s;
+        }
+        .modal-overlay.visible .modal-box { transform: translateY(0); }
+        .modal-box h3 { font-size: 15px; margin-bottom: .75rem; color: #1a1a1a; }
+        .modal-field { margin-bottom: .6rem; }
+        .modal-field label {
+            display: block; font-size: 12px; font-weight: 600;
+            color: #555; margin-bottom: 3px;
+        }
+        .modal-field input, .modal-field textarea {
+            width: 100%; padding: 6px 8px; border: 1px solid #d5d5d5;
+            border-radius: 5px; font-size: 13px; font-family: inherit;
+            background: #fafafa;
+        }
+        .modal-field textarea { resize: vertical; min-height: 50px; }
+        .modal-field input:focus, .modal-field textarea:focus {
+            outline: none; border-color: #378ADD; background: white;
+            box-shadow: 0 0 0 2px rgba(55,138,221,.15);
+        }
+        .modal-buttons { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .75rem; }
+        .modal-btn {
+            padding: 5px 14px; border-radius: 6px; font-size: 13px;
+            font-weight: 600; cursor: pointer; border: 1.5px solid; transition: all .15s;
+        }
+        .modal-btn-cancel { background: white; border-color: #cbd5e1; color: #64748b; }
+        .modal-btn-cancel:hover { background: #f1f5f9; }
+        .modal-btn-confirm { background: #378ADD; border-color: #378ADD; color: white; }
+        .modal-btn-confirm:hover { background: #2b6fb5; }
+
+        @media print { body { background: white; padding: 0; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div style="display:flex; align-items:baseline; gap:1rem; margin-bottom:.1rem;">
+        <h1>Calculateur de budget — Projet de lotissement</h1>
+        <button class="btn-reset" onclick="resetValeurs()">↺ Réinitialiser</button>
+        <button class="btn-reset" id="btnPartager" onclick="partagerURL()">📤 Partager ce scénario</button>
+    </div>
+    <p class="subtitle">Analysez la viabilité financière selon le nombre de lots vendus</p>
+
+    <div class="main-grid">
+
+        <!-- —— COLONNE GAUCHE —— -->
+        <div>
+            <!-- —— SECTIONS GRILLE —— -->
+            <div class="sections-col">
+
+                <!-- —— GROUPE : Revenus | Achat & Aménagement | Partage —— -->
+                <div class="section-group" style="grid-column:1/-1;">
+                    <div class="section-group-label">🔡 Paramètres de base</div>
+                    <div class="section-group-grid">
+
+                        <!-- 1. Revenus -->
+                        <div class="section-card theme-revenus" id="card-revenus">
+                            <div class="section-header">
+                                <span class="step-num">1</span>💰 Revenus
+                                <span class="status-dot" id="dot-revenus"></span>
+                            </div>
+                            <div class="section-body">
+                                <div class="input-row">
+                                    <label>Valeur d'un lot</label>
+                                    <div class="field-pair">
+                                        <input type="number" min="0" id="prixLot" step="1000"><span class="unit">$</span>
+                                    </div>
+                                    <div class="field-pair">
+                                        <span class="unit" style="color:#ccc">×</span>
+                                        <input type="number" id="nbLotsInput" class="narrow" min="9" max="25" step="1">
+                                    </div>
+                                </div>
+                                <div class="input-row">
+                                    <label>Valeur d'un ½-lot</label>
+                                    <div class="field-pair">
+                                        <input type="number" min="0" id="prixDemiLot" step="1000"><span class="unit">$</span>
+                                    </div>
+                                    <div class="field-pair">
+                                        <span class="unit" style="color:#ccc">×</span>
+                                        <input type="number" id="nbDemiLots" class="narrow" min="0" step="1">
+                                    </div>
+                                </div>
+                                <div class="input-row">
+                                    <label>Autres revenus</label>
+                                    <div class="field-pair">
+                                        <input type="number" id="autresRevenus" step="1000" min="0"><span class="unit">$</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="section-bilan">
+                                <span class="bilan-label">Total revenus</span>
+                                <div class="bilan-right">
+                                    <span class="bilan-amount" id="bilanRevenus">—</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Achat & Aménagement (fusionnés, sans coûts connexes) -->
+                        <div class="section-card theme-terre" id="card-depenses">
+                            <div class="section-header">
+                                <span class="step-num">2</span>🏔 Achat & Aménagement
+                                <span class="status-dot" id="dot-depenses"></span>
+                            </div>
+                            <div class="section-body">
+                                <div class="input-row">
+                                    <label>Coût de la terre</label>
+                                    <div class="field-pair">
+                                        <input type="number" min="0" id="coutTerre" step="5000"><span class="unit">$</span>
+                                    </div>
+                                </div>
+                                <div class="input-row">
+                                    <label>Arpentage</label>
+                                    <div class="field-pair">
+                                        <input type="number" min="0" id="arpentage" step="1000"><span class="unit">$</span>
+                                    </div>
+                                </div>
+                                <div class="input-row">
+                                    <label>Biologiste</label>
+                                    <div class="field-pair">
+                                        <input type="number" min="0" id="biologiste" step="1000"><span class="unit">$</span>
+                                    </div>
+                                </div>
+                                <div class="input-row">
+                                    <label>Autres coûts</label>
+                                    <div class="field-pair">
+                                        <input type="number" id="autresCoutsAmenagement" step="1000" min="0"><span class="unit">$</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="section-bilan">
+                                <span class="bilan-label">Total dépenses initiales</span>
+                                <div class="bilan-right">
+                                    <span class="seuil-badge" id="seuilDepenses">—</span>
+                                    <span class="jalon-info jalon-neutre" id="jalonDepenses">—</span>
+                                    <span class="bilan-amount" id="bilanDepenses">—</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div><!-- /section-group-grid -->
+                </div><!-- /groupe -->
+
+                <!-- —— BILAN INTERMÉDIAIRE —— -->
+                <div class="section-card theme-surplus" id="card-bilan" style="grid-column:1/-1;">
+                    <div class="section-header" style="background:#eef0f6; color:#25283D;">
+                        <span class="step-num" style="background:#25283D;color:white;">3</span>📊 Bilan — Surplus à partager
+                        <span class="status-dot" id="dot-bilan"></span>
+                    </div>
+                    <div class="section-body">
+                        <!-- Ligne 1 : équation Revenus − Dépenses = Surplus -->
+                        <div style="display:grid; grid-template-columns:1fr auto 1fr auto 1fr; align-items:center; gap:.3rem .5rem; margin-bottom:.5rem;">
+                            <div class="bilan-flow-cell" style="background:#e8f7f9; border-radius:6px; padding:.3rem .5rem;">
+                                <div class="bilan-flow-label">Revenus totaux</div>
+                                <div class="bilan-flow-amount" style="color:#1a8a96;" id="bilFlowRevenus">—</div>
+                            </div>
+                            <div class="bilan-flow-op" style="font-size:20px; color:#64748b;">−</div>
+                            <div class="bilan-flow-cell" style="background:#fdf6e3; border-radius:6px; padding:.3rem .5rem;">
+                                <div class="bilan-flow-label">Achat & aménagements</div>
+                                <div class="bilan-flow-amount" style="color:#C07D1A;" id="bilFlowDepenses">—</div>
+                            </div>
+                            <div class="bilan-flow-op" style="font-size:20px; color:#64748b;">=</div>
+                            <div class="bilan-flow-cell" style="border-radius:6px; padding:.3rem .5rem; border:2px solid #e2e8f0;" id="bilFlowSurplusCell">
+                                <div class="bilan-flow-label">Surplus à partager</div>
+                                <div class="bilan-flow-amount" id="bilFlowSurplus" style="font-size:16px;">—</div>
+                            </div>
+                        </div>
+                        <!-- Ligne 2 : partage (inputs intégrés) -->
+                        <div style="display:flex; gap:.5rem; align-items:center; margin-bottom:.4rem; padding:.3rem .4rem; background:#f1f5f9; border-radius:6px;">
+                            <span style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#64748b; white-space:nowrap;">⚖️ Partage</span>
+                            <div style="display:flex; align-items:center; gap:.35rem; flex:1;">
+                                <label style="font-size:11px; color:#555;">FRICH</label>
+                                <input type="number" id="partFRICHE" class="narrow" min="0" max="100" step="5" style="width:46px;">
+                                <span class="unit">%</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:.35rem; flex:1;">
+                                <label style="font-size:11px; color:#555;">Association</label>
+                                <input type="number" id="partAssociation" class="narrow" min="0" max="100" step="5" style="width:46px;">
+                                <span class="unit">%</span>
+                            </div>
+                            <div class="partage-warning" id="partageWarning" style="margin:0; font-size:10px;">⚠ Total ≠ 100 %</div>
+                            <span class="status-dot" id="dot-partage" style="width:16px;height:16px;font-size:9px;"></span>
+                        </div>
+                        <!-- Ligne 3 : fork visuel — FRICH & Asso -->
+                        <div style="display:flex; gap:.5rem; align-items:stretch;">
+                            <div style="flex:1; background:#f0eff9; border-radius:6px; padding:.3rem .5rem; border-top:3px solid #7E78D2;">
+                                <div class="bilan-flow-label" style="color:#1a8a96;">FRICH (<span id="surplusPctFrichee">—</span> %)</div>
+                                <div class="bilan-flow-amount" id="surplusMontantFrichee" style="color:#1a8a96;">—</div>
+                            </div>
+                            <div style="width:2px; background:linear-gradient(to bottom, #7E78D2 0%, #7E78D2 50%, transparent 50%); flex-shrink:0; margin-top:-8px;"></div>
+                            <div style="flex:1; background:#f1f4f2; border-radius:6px; padding:.3rem .5rem; border-top:3px solid #596F62;">
+                                <div class="bilan-flow-label" style="color:#596F62;">Association (<span id="surplusPctAssoc">—</span> %)</div>
+                                <div class="bilan-flow-amount" id="surplusMontantAssoc" style="color:#596F62;">—</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- —— PART ASSOCIATION — utilisation & résultat —— -->
+                <div class="section-card" id="card-chemin" style="grid-column:1/-1; border-left-color:#596F62;">
+                    <div class="section-header" style="background:#f1f4f2; color:#596F62;">
+                        <span class="step-num" style="background:#475569; color:white;">4</span>🤝 Part association
+                        <span class="status-dot" id="dot-chemin"></span>
+                    </div>
+                    <div class="section-body">
+                        <div style="display:grid; grid-template-columns:1fr auto 1fr auto 1fr auto 1fr; align-items:center; gap:.3rem .4rem;">
+                            <div class="bilan-flow-cell" style="background:#f1f4f2; border-radius:6px; padding:.3rem .5rem;">
+                                <div class="bilan-flow-label">Budget reçu (asso)</div>
+                                <div class="bilan-flow-amount" style="color:#596F62;" id="surplusMontantAssocRef">—</div>
+                            </div>
+                            <div class="bilan-flow-op" style="font-size:18px; color:#64748b;">−</div>
+                            <div class="bilan-flow-cell" style="background:#fafaf9; border-radius:6px; padding:.3rem .5rem;">
+                                <div class="bilan-flow-label">Coût du chemin</div>
+                                <div class="field-pair" style="justify-content:center; margin-top:2px;">
+                                    <input type="number" min="0" id="chemin" step="5000" style="width:80px;"><span class="unit">$</span>
+                                </div>
+                            </div>
+                            <div class="bilan-flow-op" style="font-size:18px; color:#64748b;">−</div>
+                            <div class="bilan-flow-cell" style="background:#fafaf9; border-radius:6px; padding:.3rem .5rem;">
+                                <div class="bilan-flow-label">Autres coûts</div>
+                                <div class="field-pair" style="justify-content:center; margin-top:2px;">
+                                    <input type="number" id="autresCouts" step="1000" min="0" style="width:80px;"><span class="unit">$</span>
+                                </div>
+                            </div>
+                            <div class="bilan-flow-op" style="font-size:18px; color:#64748b;">=</div>
+                            <div class="bilan-flow-cell" style="border-radius:6px; padding:.3rem .5rem;" id="surplusNetCell">
+                                <div class="bilan-flow-label">Surplus net asso.</div>
+                                <div class="bilan-flow-amount" style="font-size:15px;" id="surplusApresChemin">—</div>
+                            </div>
+                        </div>
+                        <!-- Seuil minimum de lots -->
+                        <div style="margin-top:.4rem; padding-top:.4rem; border-top:1px dashed #e2e8f0; display:flex; align-items:center; gap:.5rem; font-size:11px; color:#666;">
+                            <span>Lots nécessaires pour financer 100% du chemin :</span>
+                            <span class="seuil-badge" id="seuilSurplus">—</span>
+                            <span class="jalon-info jalon-neutre" id="jalonSurplus" style="display:none;"></span>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /sections-col -->
+
+        </div><!-- /left col -->
+
+        <!-- —— COLONNE DROITE —— -->
+        <div class="right-col">
+
+            <!-- Donut -->
+            <div class="panel-card">
+                <div class="donut-title">Répartition des fonds</div>
+                <div class="donut-wrapper">
+                    <canvas id="donutChart"></canvas>
+                    <div class="donut-center">
+                        <div class="donut-center-pct" id="donutCenterPct">—</div>
+                        <div class="donut-center-label" id="donutCenterLabel">du chemin<br>financé</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alerte globale -->
+            <div id="alerteGlobale"></div>
+
+            <!-- Curseur + fil d'ariane vertical -->
+            <div class="panel-card">
+                <div class="slider-row" style="margin-bottom:.75rem;">
+                    <label style="font-size:12px;color:#555;white-space:nowrap;">🎚 Lots</label>
+                    <input type="range" min="9" max="25" step="1" id="lotSlider">
+                    <input type="number" id="lotNumber" class="lot-num" min="9" max="25" step="1">
+                </div>
+                <div class="breadcrumb-v" id="breadcrumb">
+                    <div class="bcv-step" id="bc-terre">
+                        <div class="bcv-left">
+                            <div class="bcv-node">🏔</div>
+                            <div class="bcv-line"></div>
+                        </div>
+                        <div class="bcv-right">
+                            <div class="bcv-label">Achat de la terre</div>
+                            <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap;margin-top:2px;">
+                                <div class="bcv-amount" id="bc-amt-terre">—</div>
+                                <span class="seuil-badge" id="bc-seuil-terre" style="font-size:10px;">—</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bcv-step" id="bc-amenag">
+                        <div class="bcv-left">
+                            <div class="bcv-node">🔧</div>
+                            <div class="bcv-line"></div>
+                        </div>
+                        <div class="bcv-right">
+                            <div class="bcv-label">Aménagement</div>
+                            <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap;margin-top:2px;">
+                                <div class="bcv-amount" id="bc-amt-amenag">—</div>
+                                <span class="seuil-badge" id="bc-seuil-amenag" style="font-size:10px;">—</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bcv-step" id="bc-chemin">
+                        <div class="bcv-left">
+                            <div class="bcv-node">🤝</div>
+                            <div class="bcv-line"></div>
+                        </div>
+                        <div class="bcv-right">
+                            <div class="bcv-label">Chemin & +</div>
+                            <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap;margin-top:2px;">
+                                <div class="bcv-amount" id="bc-amt-chemin">—</div>
+                                <span class="seuil-badge" id="bc-seuil-chemin" style="font-size:10px;">—</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bcv-step" id="bc-surplus">
+                        <div class="bcv-left">
+                            <div class="bcv-node">📊</div>
+                            <!-- no line after last -->
+                        </div>
+                        <div class="bcv-right">
+                            <div class="bcv-label">Surplus partagé</div>
+                            <div class="bcv-split">
+                                <div class="bcv-split-cell">
+                                    <div class="bcv-split-label" id="bc-surplus-friche-pct">FRICH —%</div>
+                                    <div class="bcv-amount" id="bc-amt-friche">—</div>
+                                </div>
+                                <div class="bcv-split-cell">
+                                    <div class="bcv-split-label" id="bc-surplus-assoc-pct">Asso —%</div>
+                                    <div class="bcv-amount" id="bc-amt-surplus">—</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /right-col -->
+    </div><!-- /main-grid -->
+
+    <!-- —— JOURNAL DE PUBLICATION —— -->
+    <div class="journal-section" id="journalSection">
+        <div class="journal-header">
+            <h2>📋 Journal des scénarios publiés</h2>
+            <span class="journal-count" id="journalCount">0</span>
+        </div>
+        <div id="journalBody">
+            <div class="journal-empty" id="journalEmpty">Aucun scénario publié pour le moment.</div>
+            <ul class="journal-list" id="journalList"></ul>
+        </div>
+    </div>
+
+</div><!-- /container -->
+
+<!-- —— MODALE DE PUBLICATION —— -->
+<div class="modal-overlay" id="modalPublier">
+    <div class="modal-box">
+        <h3>📤 Publier ce scénario</h3>
+        <div class="modal-field">
+            <label for="modalNom">Nom du scénario</label>
+            <input type="text" id="modalNom" placeholder="Ex: Scénario 18 lots optimiste">
+        </div>
+        <div class="modal-field">
+            <label for="modalDesc">Description</label>
+            <textarea id="modalDesc" placeholder="Ex: Avec terrain à 370k et chemin à 60k"></textarea>
+        </div>
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-cancel" onclick="fermerModal()">Annuler</button>
+            <button class="modal-btn modal-btn-confirm" onclick="confirmerPublication()">Publier</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+    const COLORS = {
+        revenus : '#84C7D0', terre   : '#C07D1A',
+        amenag  : '#d4a843', chemin  : '#596F62',
+        cheminP : '#e08080', surplus : '#16a34a',
+        deficit : '#fca5a5',
+    };
+    const LOT_MIN = 9, LOT_MAX = 25;
+    let donutChart;
+
+    // —— Inputs ——
+    function getInputs() {
+        const n = id => { const el = document.getElementById(id); return el ? (parseInt(el.value) || 0) : 0; };
+        const cl = (v, mn, mx) => Math.max(mn, Math.min(mx, v));
+        return {
+            prixLot       : n('prixLot')  || CONFIG.prixLot,
+            nbLots        : cl(n('lotNumber'), LOT_MIN, LOT_MAX),
+            prixDemiLot   : n('prixDemiLot'),
+            nbDemiLots    : n('nbDemiLots'),
+            autresRevenus : n('autresRevenus'),
+            coutTerre        : n('coutTerre'),
+            arpentage              : n('arpentage'),
+            biologiste             : n('biologiste'),
+            autresCoutsAmenagement : n('autresCoutsAmenagement'),
+            chemin      : (()=>{ const el=document.getElementById('chemin'); return el && el.value!=='' ? (parseInt(el.value)||0) : CONFIG.chemin; })(),
+            autresCouts : n('autresCouts'),
+            partFRICHE : cl(n('partFRICHE'),    0, 100),
+            partAssoc  : cl(n('partAssociation'), 0, 100),
+        };
+    }
+
+    // —— Calculs ——
+    function calculer(nbLots, inp) {
+        const revenus       = nbLots * inp.prixLot + inp.nbDemiLots * inp.prixDemiLot + inp.autresRevenus;
+        const totalTerre    = inp.coutTerre;
+        const totalAmenag   = inp.arpentage + inp.biologiste + inp.autresCoutsAmenagement;
+        // Seuls terre + aménagement sont déduits avant le partage
+        const totalDepenses = totalTerre + totalAmenag;
+        const surplus       = revenus - totalDepenses;
+        const budgetFriche  = surplus > 0 ? Math.round(surplus * inp.partFRICHE / 100) : 0;
+        const budgetAssoc   = surplus > 0 ? Math.round(surplus * inp.partAssoc  / 100) : 0;
+        // L'association paie ensuite chemin + autres coûts depuis sa part
+        const budgetAssocNet = budgetAssoc - inp.chemin - inp.autresCouts;
+        return { revenus, totalTerre, totalAmenag, totalDepenses, surplus, budgetAssoc, budgetAssocNet, budgetFriche };
+    }
+
+    // Lots nécessaires pour que les revenus couvrent un seuil cumulatif
+    function seuilCumulatif(cible, inp) {
+        const fixed = inp.nbDemiLots * inp.prixDemiLot + inp.autresRevenus;
+        if (!inp.prixLot) return null;
+        const n = Math.ceil((cible - fixed) / inp.prixLot);
+        return Math.max(0, n);
+    }
+
+    // Lots pour que le budget association couvre chemin + autres coûts
+    function seuilChemin(inp) {
+        const fixed = inp.nbDemiLots * inp.prixDemiLot + inp.autresRevenus;
+        const dep   = inp.coutTerre
+                    + inp.arpentage + inp.biologiste + inp.autresCoutsAmenagement;
+        const cible = inp.chemin + inp.autresCouts;
+        for (let i = 0; i <= 200; i++) {
+            const s = i * inp.prixLot + fixed - dep;
+            if (s > 0 && Math.round(s * inp.partAssoc / 100) >= cible) return i;
+        }
+        return null;
+    }
+
+    function fmt(n) { return Math.abs(n).toLocaleString('fr-CA') + ' $'; }
+
+    function seuilBadge(s, id) {
+        const cls = s === null ? 'seuil-impossible' : s === 0 ? 'seuil-ok' : (s <= LOT_MAX ? '' : 'seuil-impossible');
+        const txt = s === null ? 'Impossible' : s === 0 ? '✓ Couvert' : '≥ ' + s + ' lot' + (s > 1 ? 's' : '');
+        document.getElementById(id).outerHTML = `<span class="seuil-badge ${cls}" id="${id}">${txt}</span>`;
+    }
+
+    function jalonBadge(atteint, diff, id) {
+        if (atteint) {
+            document.getElementById(id).outerHTML = `<span class="jalon-info" id="${id}" style="display:none"></span>`;
+        } else {
+            document.getElementById(id).outerHTML = `<span class="jalon-info jalon-manque" id="${id}">−${fmt(Math.abs(diff))}</span>`;
+        }
+    }
+
+    // —— Fil d'ariane ——
+    function setBcStep(id, state) {
+        const el = document.getElementById('bc-' + id);
+        if (!el) return;
+        // support both horizontal (bc-step) and vertical (bcv-step) variants
+        const base = el.className.match(/bcv-step/) ? 'bcv-step' : 'bc-step';
+        el.className = base + (state ? ' ' + state : '');
+    }
+
+    // —— setStatut (cards + dots) ——
+    function setStatut(key, ok) {
+        const cardCls = ok === true ? 's-ok' : ok === false ? 's-danger' : 's-active';
+        const dotCls  = ok === true ? 'ok'   : ok === false ? 'danger'   : 'active';
+        const dotTxt  = ok === true ? '✓'    : ok === false ? '✕'        : '…';
+        const card = document.getElementById('card-' + key);
+        const dot  = document.getElementById('dot-'  + key);
+        if (card) card.className = card.className.replace(/\bs-\w+/g, '').trim() + ' ' + cardCls;
+        if (dot)  { dot.className = 'status-dot ' + dotCls; dot.textContent = dotTxt; }
+    }
+
+    function mettreAJourBilans() {
+        const inp = getInputs();
+        const { revenus, totalTerre, totalAmenag, totalDepenses, surplus, budgetAssoc, budgetAssocNet, budgetFriche } = calculer(inp.nbLots, inp);
+        document.getElementById('bilanRevenus').textContent = fmt(revenus);
+
+        // Partage
+        const ptotal = inp.partFRICHE + inp.partAssoc;
+        document.getElementById('partageWarning').style.display = ptotal !== 100 ? 'block' : 'none';
+
+        // Dépenses initiales (terre + aménagement fusionnés)
+        const cumulA = totalTerre + totalAmenag; // = totalDepenses
+        const s1 = seuilCumulatif(cumulA, inp);
+        seuilBadge(s1, 'seuilDepenses');
+        document.getElementById('bilanDepenses').textContent = fmt(cumulA);
+        jalonBadge(revenus >= cumulA, revenus - cumulA, 'jalonDepenses');
+
+        // Bilan intermédiaire
+        document.getElementById('bilFlowRevenus').textContent  = fmt(revenus);
+        document.getElementById('bilFlowDepenses').textContent = fmt(totalDepenses);
+        document.getElementById('bilFlowSurplus').textContent  = (surplus < 0 ? '−' : '') + fmt(surplus);
+        document.getElementById('bilFlowSurplus').style.color  = surplus < 0 ? '#dc2626' : '#15803d';
+        const surplusCell = document.getElementById('bilFlowSurplusCell');
+        if (surplusCell) {
+            surplusCell.style.background   = surplus < 0 ? '#fef2f2' : '#dcfce7';
+            surplusCell.style.borderColor  = surplus < 0 ? '#dc2626' : '#16a34a';
+        }
+        document.getElementById('surplusPctFrichee').textContent    = inp.partFRICHE;
+        document.getElementById('surplusPctAssoc').textContent     = inp.partAssoc;
+        document.getElementById('surplusMontantFrichee').textContent = fmt(budgetFriche);
+        document.getElementById('surplusMontantAssoc').textContent  = fmt(budgetAssoc);
+
+        // Part association — chemin & résultat
+        const s2 = seuilChemin(inp);
+        seuilBadge(s2, 'seuilSurplus');
+        jalonBadge(budgetAssocNet >= 0, budgetAssocNet, 'jalonSurplus');
+        document.getElementById('surplusApresChemin').textContent  = (budgetAssocNet < 0 ? '−' : '') + fmt(budgetAssocNet);
+        document.getElementById('surplusApresChemin').style.color  = budgetAssocNet >= 0 ? '#15803d' : '#dc2626';
+        document.getElementById('surplusMontantAssocRef').textContent = fmt(budgetAssoc);
+        // Color the surplus net cell background
+        const netCell = document.getElementById('surplusNetCell');
+        if (netCell) netCell.style.background = budgetAssocNet >= 0 ? '#dcfce7' : '#fee2e2';
+
+        // Cards + dots + fil d'ariane
+        const okPartage  = ptotal === 100;
+        const okDepenses = revenus >= cumulA;
+        const okBilan    = surplus > 0;
+        const okChemin   = budgetAssoc >= inp.chemin;
+        const okSurplus  = budgetAssocNet >= 0;
+
+        setStatut('revenus',  null);
+        setStatut('partage',  okPartage ? null : false);
+        setStatut('depenses', okDepenses);
+        setStatut('bilan',    okBilan);
+        // card-chemin: no card-level status — result shown inline in the formula
+
+        // Fil d'ariane — montants et seuils
+        const bcAmt = (id, ok, val) => {
+            const el = document.getElementById('bc-amt-' + id);
+            if (!el) return;
+            if (ok) el.textContent = fmt(val);
+            else    el.textContent = '−' + fmt(Math.abs(val));
+        };
+        const bcSeuil = (id, s) => {
+            const el = document.getElementById('bc-seuil-' + id);
+            if (!el) return;
+            if (s === null)      { el.textContent = 'Impossible'; el.className = 'seuil-badge seuil-impossible'; }
+            else if (s === 0)    { el.textContent = '✓ Couvert'; el.className = 'seuil-badge seuil-ok'; }
+            else                 { el.textContent = '≥ ' + s + ' lot' + (s > 1 ? 's' : ''); el.className = 'seuil-badge' + (s > LOT_MAX ? ' seuil-impossible' : ''); }
+        };
+        // Terre : toujours son propre coût
+        bcAmt('terre',   true, totalTerre);
+        // Aménagement : total arpentage+biologiste+autres (regroupé)
+        bcAmt('amenag',  okDepenses, totalAmenag > 0 ? totalAmenag : 0);
+        bcAmt('chemin',  okChemin,   okChemin   ? inp.chemin : inp.chemin - budgetAssoc);
+        // Seuils (lots minimum)
+        bcSeuil('terre',  s1);
+        bcSeuil('amenag', s1);
+        bcSeuil('chemin', s2);
+        // Surplus : part FRICH et part association côte à côte
+        document.getElementById('bc-surplus-friche-pct').textContent = 'FRICH ' + inp.partFRICHE + '%';
+        document.getElementById('bc-surplus-assoc-pct').textContent  = 'Asso ' + inp.partAssoc + '%';
+        const amtFriche = document.getElementById('bc-amt-friche');
+        const amtAssoc  = document.getElementById('bc-amt-surplus');
+        if (amtFriche) {
+            amtFriche.textContent      = surplus > 0 ? fmt(budgetFriche) : '—';
+            amtFriche.style.background = surplus > 0 ? '#f0eff9' : '#f1f5f9';
+            amtFriche.style.color      = surplus > 0 ? '#5a54a3' : '#94a3b8';
+        }
+        const assocOk  = surplus > 0 && budgetAssocNet >= 0;
+        const assocBad = surplus > 0 && budgetAssocNet < 0;
+        if (amtAssoc) {
+            amtAssoc.textContent      = surplus > 0 ? fmt(Math.abs(budgetAssocNet)) : '—';
+            amtAssoc.style.background = assocOk ? '#f1f4f2' : assocBad ? '#fee2e2' : '#f1f5f9';
+            amtAssoc.style.color      = assocOk ? '#596F62' : assocBad ? '#b91c1c' : '#94a3b8';
+        }
+        const labelFriche = document.getElementById('bc-surplus-friche-pct');
+        const labelAssoc  = document.getElementById('bc-surplus-assoc-pct');
+        if (labelFriche) labelFriche.style.color = surplus > 0 ? '#5a54a3' : '#94a3b8';
+        if (labelAssoc)  labelAssoc.style.color  = assocOk ? '#596F62' : assocBad ? '#b91c1c' : '#94a3b8';
+
+        // Fil d'ariane — états (ok ou danger, pas de bleu intermédiaire)
+        const step1 = okPartage;
+        setBcStep('terre',   !step1 ? '' : okDepenses ? 'ok' : 'danger');
+        setBcStep('amenag',  !step1 ? '' : okDepenses ? 'ok' : 'danger');
+        setBcStep('chemin',  !step1 ? '' : okChemin   ? 'ok' : 'danger');
+        setBcStep('surplus', ''); // toujours neutre — FRICH et asso gèrent leur couleur individuellement
+    }
+
+    // —— Donut ——
+    function mettreAJourDonut() {
+        const inp = getInputs();
+        const { revenus, totalTerre, totalAmenag, surplus, budgetAssoc, budgetAssocNet, budgetFriche } = calculer(inp.nbLots, inp);
+        const cheminFin  = Math.min(budgetAssoc, inp.chemin);
+        const resteAssoc = Math.max(0, budgetAssocNet);
+        const manque     = Math.max(0, inp.chemin - budgetAssoc);
+
+        const labels = [], data = [], colors = [];
+        if (surplus < 0) {
+            labels.push('Revenus'); data.push(revenus); colors.push(COLORS.revenus);
+            labels.push('Déficit'); data.push(Math.abs(surplus)); colors.push(COLORS.deficit);
+        } else {
+            if (totalTerre > 0)    { labels.push('Achat terre');  data.push(totalTerre);  colors.push(COLORS.terre);  }
+            if (totalAmenag > 0)   { labels.push('Aménagement');  data.push(totalAmenag); colors.push(COLORS.amenag); }
+            if (inp.autresCouts>0) { labels.push('Autres coûts'); data.push(inp.autresCouts); colors.push('#e9d5ff'); }
+            if (budgetFriche > 0)  { labels.push('FRICH (' + inp.partFRICHE + ' %)'); data.push(budgetFriche); colors.push('#7E78D2'); }
+            if (cheminFin > 0)     { labels.push(manque > 0 ? 'Vers chemin (partiel)' : 'Chemin'); data.push(cheminFin); colors.push(manque > 0 ? COLORS.cheminP : COLORS.chemin); }
+            if (resteAssoc > 0)    { labels.push('Surplus assoc.'); data.push(resteAssoc); colors.push(COLORS.surplus); }
+        }
+
+        const pct = inp.chemin > 0 ? Math.min(100, Math.round(budgetAssoc / inp.chemin * 100)) : 0;
+        const cPct = document.getElementById('donutCenterPct');
+        const cLbl = document.getElementById('donutCenterLabel');
+        if (surplus < 0)            { cPct.textContent = '⚠ '; cPct.style.color = '#dc2626'; cLbl.innerHTML = 'déficit'; }
+        else if (budgetAssoc === 0) { cPct.textContent = '0 %'; cPct.style.color = '#aaa'; cLbl.innerHTML = 'du chemin<br>financé'; }
+        else if (manque > 0)        { cPct.textContent = pct + ' %'; cPct.style.color = '#f97316'; cLbl.innerHTML = 'du chemin<br>financé'; }
+        else                        { cPct.textContent = '100 %'; cPct.style.color = '#16a34a'; cLbl.innerHTML = 'du chemin<br>financé'; }
+
+        if (donutChart) {
+            donutChart.data.labels = labels;
+            donutChart.data.datasets[0].data = data;
+            donutChart.data.datasets[0].backgroundColor = colors;
+            donutChart.update();
+        } else {
+            donutChart = new Chart(document.getElementById('donutChart'), {
+                type: 'doughnut',
+                data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: '#fff', hoverOffset: 6 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '58%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 11, padding: 8, font: { size: 11 } } },
+                        tooltip: { callbacks: { label: ctx => {
+                            const total = ctx.chart.data.datasets[0].data.reduce((a,b)=>a+b,0);
+                            const p = total ? Math.round(ctx.parsed/total*100) : 0;
+                            return ' ' + ctx.label + ' : ' + Math.round(ctx.parsed).toLocaleString('fr-CA') + ' $ (' + p + ' %)';
+                        }}}
+                    }
+                }
+            });
+        }
+
+        // Alerte chemin dans le donut center (tag supprimé)
+    }
+
+    // —— Alerte globale ——
+    function mettreAJourAlerte() {
+        const inp = getInputs();
+        const { surplus, budgetAssoc, budgetAssocNet } = calculer(inp.nbLots, inp);
+        const div = document.getElementById('alerteGlobale');
+        const s = (bg, bc, c, t) => `<div style="background:${bg};border-color:${bc};color:${c}">${t}</div>`;
+        if (inp.partFRICHE + inp.partAssoc !== 100)
+            div.innerHTML = s('#fff7ed','#f59e0b','#92400e', `<strong>⚠️ Partage invalide</strong> — Total = ${inp.partFRICHE + inp.partAssoc} %`);
+        else if (surplus < 0)
+            div.innerHTML = s('#fef2f2','#dc2626','#7f1d1d', `<strong>⚠️ Déficit</strong> — Manque ${fmt(Math.abs(surplus))} pour couvrir les dépenses`);
+        else if (budgetAssoc === 0)
+            div.innerHTML = s('#fff4e5','#f59e0b','#92400e', `<strong>⚠️ Aucun budget</strong> — Pas encore de surplus à distribuer`);
+        else if (budgetAssocNet < 0)
+            div.innerHTML = s('#fef2f2','#dc2626','#7f1d1d', `<strong>⚠️ Budget insuffisant</strong> — Manque ${fmt(Math.abs(budgetAssocNet))} pour le chemin`);
+        else if (budgetAssocNet < 10000)
+            div.innerHTML = s('#fff4e5','#f59e0b','#92400e', `<strong>Budget serré</strong> — Seulement ${fmt(budgetAssocNet)} de marge`);
+        else
+            div.innerHTML = s('#f0fdf4','#22c55e','#14532d', `<strong>✅ Budget suffisant</strong> — ${fmt(budgetAssocNet)} disponibles après le chemin`);
+    }
+
+    function resetValeurs() {
+        const ids = {
+            prixLot: DEFAULTS.prixLot, nbLotsInput: DEFAULTS.nbLots,
+            prixDemiLot: DEFAULTS.prixDemiLot, nbDemiLots: DEFAULTS.nbDemiLots,
+            autresRevenus: DEFAULTS.autresRevenus, coutTerre: DEFAULTS.coutTerre,
+            arpentage: DEFAULTS.arpentage, biologiste: DEFAULTS.biologiste,
+            autresCoutsAmenagement: DEFAULTS.autresCoutsAmenagement,
+            chemin: DEFAULTS.chemin, autresCouts: DEFAULTS.autresCouts,
+            partFRICHE: DEFAULTS.partFRICHE, partAssociation: DEFAULTS.partAssociation
+        };
+        Object.entries(ids).forEach(([id, val]) => {
+            const el = document.getElementById(id);
+            if (el) el.value = val;
+        });
+        document.getElementById('lotSlider').value = DEFAULTS.nbLots;
+        document.getElementById('lotNumber').value  = DEFAULTS.nbLots;
+        // Remove URL params on reset
+        window.history.replaceState({}, '', window.location.pathname);
+        mettreAJourTout();
+    }
+
+    // —— Helpers URL params ——
+    const PARAM_MAP = {
+        prixLot: 'prixLot', nbLots: 'lotNumber',
+        prixDemiLot: 'prixDemiLot', nbDemiLots: 'nbDemiLots',
+        autresRevenus: 'autresRevenus', coutTerre: 'coutTerre',
+        arpentage: 'arpentage', biologiste: 'biologiste',
+        autresCoutsAmenagement: 'autresCoutsAmenagement',
+        chemin: 'chemin', autresCouts: 'autresCouts',
+        partFRICHE: 'partFRICHE', partAssociation: 'partAssociation'
+    };
+
+    function buildURL() {
+        const params = new URLSearchParams();
+        for (const [key, inputId] of Object.entries(PARAM_MAP)) {
+            const el = document.getElementById(inputId);
+            if (el) params.set(key, el.value);
+        }
+        return window.location.origin + window.location.pathname + '?' + params.toString();
+    }
+
+    // —— Modale de publication ——
+    function partagerURL() {
+        document.getElementById('modalNom').value = '';
+        document.getElementById('modalDesc').value = '';
+        document.getElementById('modalPublier').classList.add('visible');
+        document.getElementById('modalNom').focus();
+    }
+
+    function fermerModal() {
+        document.getElementById('modalPublier').classList.remove('visible');
+    }
+
+    document.getElementById('modalPublier').addEventListener('click', e => {
+        if (e.target === e.currentTarget) fermerModal();
+    });
+
+    function confirmerPublication() {
+        const nom  = document.getElementById('modalNom').value.trim();
+        const desc = document.getElementById('modalDesc').value.trim();
+        if (!nom) { document.getElementById('modalNom').focus(); return; }
+
+        const url = buildURL();
+        const entry = {
+            id: Date.now(),
+            nom,
+            desc,
+            url,
+            date: new Date().toLocaleString('fr-CA')
+        };
+
+        const journal = JSON.parse(localStorage.getItem('journal_scenarios') || '[]');
+        journal.unshift(entry);
+        localStorage.setItem('journal_scenarios', JSON.stringify(journal));
+
+        fermerModal();
+        renderJournal();
+
+        // Copier le lien
+        navigator.clipboard.writeText(url).then(() => {
+            const btn = document.getElementById('btnPartager');
+            const orig = btn.textContent;
+            btn.textContent = '✓ Publié & copié !';
+            btn.style.background = '#dcfce7';
+            btn.style.borderColor = '#16a34a';
+            btn.style.color = '#15803d';
+            setTimeout(() => {
+                btn.textContent = orig;
+                btn.style.background = '';
+                btn.style.borderColor = '';
+                btn.style.color = '';
+            }, 2000);
+        });
+    }
+
+    // —— Journal ——
+    function getJournal() {
+        return JSON.parse(localStorage.getItem('journal_scenarios') || '[]');
+    }
+
+    function saveJournal(journal) {
+        localStorage.setItem('journal_scenarios', JSON.stringify(journal));
+    }
+
+    function renderJournal() {
+        const journal = getJournal();
+        const list  = document.getElementById('journalList');
+        const empty = document.getElementById('journalEmpty');
+        const count = document.getElementById('journalCount');
+
+        count.textContent = journal.length;
+        empty.style.display = journal.length ? 'none' : 'block';
+        list.innerHTML = '';
+
+        journal.forEach((entry, idx) => {
+            const li = document.createElement('li');
+            li.className = 'journal-entry';
+            li.innerHTML = `
+                <div style="font-size:16px; padding-top:2px;">📄</div>
+                <div class="journal-entry-body">
+                    <input class="journal-entry-name" value="${esc(entry.nom)}"
+                           data-idx="${idx}" data-field="nom"
+                           onchange="editJournalField(this)">
+                    <textarea class="journal-entry-desc" rows="1"
+                              data-idx="${idx}" data-field="desc"
+                              onchange="editJournalField(this)">${esc(entry.desc)}</textarea>
+                    <div class="journal-entry-meta">${entry.date}</div>
+                </div>
+                <div class="journal-entry-actions">
+                    <button class="journal-btn" onclick="copierLien(${idx})">📋 Copier</button>
+                    <button class="journal-btn" onclick="chargerScenario(${idx})">⬇ Charger</button>
+                    <button class="journal-btn danger" onclick="supprimerScenario(${idx})">✕ Supprimer</button>
+                </div>
+            `;
+            list.appendChild(li);
+        });
+    }
+
+    function esc(s) {
+        const d = document.createElement('div');
+        d.textContent = s || '';
+        return d.innerHTML;
+    }
+
+    function editJournalField(el) {
+        const journal = getJournal();
+        const idx   = parseInt(el.dataset.idx);
+        const field = el.dataset.field;
+        journal[idx][field] = el.value.trim();
+        saveJournal(journal);
+    }
+
+    function copierLien(idx) {
+        const journal = getJournal();
+        navigator.clipboard.writeText(journal[idx].url);
+    }
+
+    function chargerScenario(idx) {
+        const journal = getJournal();
+        window.location.href = journal[idx].url;
+    }
+
+    function supprimerScenario(idx) {
+        const journal = getJournal();
+        journal.splice(idx, 1);
+        saveJournal(journal);
+        renderJournal();
+    }
+
+    function mettreAJourTout() {
+        mettreAJourBilans();
+        mettreAJourDonut();
+        mettreAJourAlerte();
+    }
+
+    // —— Sync lots ——
+    function syncLots(val) {
+        val = Math.max(LOT_MIN, Math.min(LOT_MAX, val || LOT_MIN));
+        document.getElementById('lotSlider').value   = val;
+        document.getElementById('lotNumber').value   = val;
+        document.getElementById('nbLotsInput').value = val;
+        mettreAJourTout();
+    }
+    document.getElementById('lotSlider').addEventListener('input',   e => syncLots(+e.target.value));
+    document.getElementById('lotNumber').addEventListener('input',   e => syncLots(+e.target.value));
+    document.getElementById('nbLotsInput').addEventListener('input', e => syncLots(+e.target.value));
+
+    // ⚖️ Partage auto-complément ——
+    document.getElementById('partFRICHE').addEventListener('input', e => {
+        const v = Math.max(0, Math.min(100, +e.target.value || 0));
+        e.target.value = v;
+        document.getElementById('partAssociation').value = 100 - v;
+        mettreAJourTout();
+    });
+    document.getElementById('partAssociation').addEventListener('input', e => {
+        const v = Math.max(0, Math.min(100, +e.target.value || 0));
+        e.target.value = v;
+        document.getElementById('partFRICHE').value = 100 - v;
+        mettreAJourTout();
+    });
+
+    ['prixLot','prixDemiLot','nbDemiLots','autresRevenus',
+     'coutTerre',
+     'arpentage','biologiste','autresCoutsAmenagement',
+     'chemin','autresCouts'].forEach(id =>
+        document.getElementById(id).addEventListener('input', mettreAJourTout));
+
+    // —— Init ——
+    document.getElementById('prixLot').value                  = CONFIG.prixLot;
+    document.getElementById('nbLotsInput').value              = CONFIG.nbLots;
+    document.getElementById('prixDemiLot').value              = CONFIG.prixDemiLot;
+    document.getElementById('nbDemiLots').value               = CONFIG.nbDemiLots;
+    document.getElementById('autresRevenus').value            = CONFIG.autresRevenus;
+    document.getElementById('coutTerre').value                = CONFIG.coutTerre;
+    document.getElementById('arpentage').value                = CONFIG.arpentage;
+    document.getElementById('biologiste').value               = CONFIG.biologiste;
+    document.getElementById('autresCoutsAmenagement').value   = CONFIG.autresCoutsAmenagement;
+    document.getElementById('chemin').value                   = CONFIG.chemin;
+    document.getElementById('autresCouts').value              = CONFIG.autresCouts;
+    document.getElementById('partFRICHE').value               = CONFIG.partFRICHE;
+    document.getElementById('partAssociation').value          = CONFIG.partAssociation;
+    document.getElementById('lotSlider').value                = CONFIG.nbLots;
+    document.getElementById('lotNumber').value                = CONFIG.nbLots;
+
+    // —— Prevent negative values ——
+    document.querySelectorAll('input[type="number"][min="0"]').forEach(el => {
+        el.addEventListener('input', () => {
+            if (el.value !== '' && parseFloat(el.value) < 0) {
+                el.value = 0; mettreAJourTout();
+            }
+        });
+    });
+
+    mettreAJourTout();
+    renderJournal();
+</script>
+</body>
+</html>
