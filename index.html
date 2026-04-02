@@ -717,11 +717,74 @@
     </style>
 </head>
 <body>
+
+<!-- —— POPUP CHOIX DE RÔLE —— -->
+<div class="role-overlay" id="roleOverlay">
+    <div class="role-box">
+        <h2>Bienvenue</h2>
+        <p>Comment souhaitez-vous accéder au calculateur ?</p>
+        <div class="role-buttons">
+            <button class="role-btn" onclick="choisirRole('admin')">
+                <span class="role-icon">&#9881;</span>
+                <span class="role-label">Configurer</span>
+                <span class="role-desc">Accès administrateur — créer, modifier et supprimer des scénarios</span>
+            </button>
+            <button class="role-btn" onclick="choisirRole('visiteur')">
+                <span class="role-icon">&#128065;</span>
+                <span class="role-label">Contempler</span>
+                <span class="role-desc">Consulter les scénarios et jouer avec le calculateur</span>
+            </button>
+        </div>
+        <div class="role-pw" id="rolePw">
+            <label for="rolePwInput">Mot de passe administrateur</label>
+            <input type="password" id="rolePwInput" placeholder="Entrez le mot de passe"
+                   onkeydown="if(event.key==='Enter') validerMdp()">
+            <div class="pw-error" id="pwError">Mot de passe incorrect.</div>
+            <div class="pw-actions">
+                <button class="pw-btn-cancel" onclick="annulerMdp()">Annuler</button>
+                <button class="pw-btn-ok" onclick="validerMdp()">Valider</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    let _userRole = null;
+
+    function choisirRole(role) {
+        if (role === 'admin') {
+            document.getElementById('rolePw').style.display = 'block';
+            document.getElementById('rolePwInput').focus();
+            return;
+        }
+        _userRole = 'visiteur';
+        document.body.classList.add('visiteur');
+        document.getElementById('roleOverlay').remove();
+    }
+
+    function validerMdp() {
+        const pw = document.getElementById('rolePwInput').value;
+        if (pw === 'cpastantsecret') {
+            _userRole = 'admin';
+            document.getElementById('roleOverlay').remove();
+        } else {
+            document.getElementById('pwError').style.display = 'block';
+            document.getElementById('rolePwInput').value = '';
+            document.getElementById('rolePwInput').focus();
+        }
+    }
+
+    function annulerMdp() {
+        document.getElementById('rolePw').style.display = 'none';
+        document.getElementById('rolePwInput').value = '';
+        document.getElementById('pwError').style.display = 'none';
+    }
+</script>
+
 <div class="container">
     <div style="display:flex; align-items:center; gap:1rem; margin-bottom:.1rem; flex-wrap:wrap;">
         <h1>Calculateur de budget — Projet de lotissement</h1>
         <span id="scenarioActif" style="font-size:13px; font-weight:600; color:#378ADD; display:none;"></span>
-        <button class="btn-reset" id="btnSauvegarder" onclick="ouvrirSauvegarde()">💾 Sauvegarder ce scénario</button>
+        <button class="btn-reset admin-only" id="btnSauvegarder" onclick="ouvrirSauvegarde()">💾 Sauvegarder ce scénario</button>
     </div>
     <p class="subtitle">Analysez la viabilité financière selon le nombre de lots vendus</p>
 
@@ -1525,7 +1588,7 @@
                     <a class="journal-entry-name${isActive ? ' active' : ''}" href="#" onclick="chargerScenario(${idx}); return false;">${esc(entry.nom)}</a>${descHtml}
                     <div class="journal-entry-meta">${entry.date}</div>
                 </div>
-                <div class="journal-entry-actions">
+                <div class="journal-entry-actions admin-only">
                     <button class="journal-btn" onclick="dupliquerScenario(${idx})">📋 Dupliquer</button>
                     <button class="journal-btn danger" onclick="supprimerScenario(${idx})">✕ Supprimer</button>
                 </div>
