@@ -564,6 +564,14 @@
             cursor: pointer; transition: background .2s, border-color .2s, color .2s;
         }
         .btn-reset:hover { background: #f1f5f9; border-color: #94a3b8; color: #334155; }
+        .btn-icon {
+            font-size: 16px; padding: 2px 6px; border-radius: 5px;
+            border: 1.5px solid #cbd5e1; background: white;
+            cursor: pointer; transition: background .15s, border-color .15s;
+            line-height: 1;
+        }
+        .btn-icon:hover { background: #f1f5f9; border-color: #94a3b8; }
+        .btn-icon-danger:hover { background: #fef2f2; border-color: #fca5a5; }
         /* —— Journal de publication —— */
         .journal-section {
             margin-top: 1rem;
@@ -626,6 +634,21 @@
         }
         .journal-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
         .journal-btn.danger:hover { background: #fef2f2; border-color: #fca5a5; color: #dc2626; }
+        .journal-btn-icon {
+            font-size: 14px; padding: 2px 5px; border-radius: 4px;
+            border: 1px solid #e2e8f0; background: white;
+            cursor: pointer; transition: all .15s; line-height: 1;
+        }
+        .journal-btn-icon:hover { background: #f1f5f9; border-color: #94a3b8; }
+        .journal-btn-icon.danger:hover { background: #fef2f2; border-color: #fca5a5; }
+        .star-btn {
+            font-size: 16px; background: none; border: none;
+            cursor: pointer; padding: 0 2px; line-height: 1;
+            transition: transform .15s;
+        }
+        .star-btn:hover { transform: scale(1.2); }
+        .star-btn.active { color: #f59e0b; }
+        .star-btn.inactive { color: #cbd5e1; }
 
         /* —— Modale —— */
         .modal-overlay {
@@ -782,10 +805,14 @@
 </script>
 
 <div class="container">
-    <div style="display:flex; align-items:baseline; gap:1rem; margin-bottom:.1rem; flex-wrap:wrap;">
+    <div style="display:flex; align-items:center; gap:.6rem; margin-bottom:.1rem; flex-wrap:wrap;">
         <h1>Calculateur de budget — Projet de lotissement</h1>
-        <button class="btn-reset admin-only" id="btnSauvegarder" onclick="ouvrirSauvegarde()">💾 Sauvegarder ce scénario</button>
-        <span id="scenarioActif" style="font-size:16px; font-weight:700; color:#378ADD; display:none;"></span>
+        <span id="scenarioActif" style="font-size:14px; font-weight:700; color:#378ADD; display:none;"></span>
+        <span id="headerActions" style="display:inline-flex; gap:4px; align-items:center;">
+            <button class="btn-icon admin-only" id="btnSauvegarder" onclick="ouvrirSauvegarde()" title="Sauvegarder">💾</button>
+            <button class="btn-icon admin-only" id="btnDupliquerHeader" onclick="dupliquerScenarioActif()" title="Dupliquer" style="display:none;">📋</button>
+            <button class="btn-icon admin-only btn-icon-danger" id="btnSupprimerHeader" onclick="supprimerScenarioActif()" title="Supprimer" style="display:none;">🗑</button>
+        </span>
     </div>
     <p class="subtitle">Analysez la viabilité financière selon le nombre de lots vendus</p>
 
@@ -1103,6 +1130,11 @@
         <div class="modal-field">
             <label for="modalDesc">Description</label>
             <textarea id="modalDesc" placeholder="Ex: Avec terrain à 370k et chemin à 60k"></textarea>
+        </div>
+        <div class="modal-field admin-only">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+                <input type="checkbox" id="modalDefaut"> Utiliser comme valeurs par défaut
+            </label>
         </div>
         <div class="modal-buttons">
             <button class="modal-btn modal-btn-cancel" onclick="fermerModal()">Annuler</button>
@@ -1423,15 +1455,25 @@
 
     function setScenarioActif(id, nom) {
         _scenarioActifId = id;
-        const label = document.getElementById('scenarioActif');
-        const btn   = document.getElementById('btnSauvegarder');
+        const label  = document.getElementById('scenarioActif');
+        const btnDup = document.getElementById('btnDupliquerHeader');
+        const btnDel = document.getElementById('btnSupprimerHeader');
         if (id) {
-            label.textContent = '📌 ' + nom;
+            const entry = getJournal().find(e => e.id === id);
+            const icon = (entry && entry.isDefault) ? '⭐' : '📌';
+            label.textContent = icon + ' ' + nom;
             label.style.display = '';
-            btn.textContent = '💾 Mettre à jour';
+            btnDup.style.display = '';
+            btnDel.style.display = '';
+        } else if (_defaultsFromDB) {
+            label.textContent = '⭐ Valeurs par défaut';
+            label.style.display = '';
+            btnDup.style.display = 'none';
+            btnDel.style.display = 'none';
         } else {
             label.style.display = 'none';
-            btn.textContent = '💾 Sauvegarder ce scénario';
+            btnDup.style.display = 'none';
+            btnDel.style.display = 'none';
         }
     }
 
@@ -1457,15 +1499,18 @@
         const modal = document.getElementById('modalPublier');
         const titre = document.getElementById('modalTitre');
         const btnC  = document.getElementById('modalBtnConfirm');
+        const chk   = document.getElementById('modalDefaut');
         if (_scenarioActifId) {
             const entry = getJournal().find(e => e.id === _scenarioActifId);
             document.getElementById('modalNom').value  = entry ? entry.nom : '';
             document.getElementById('modalDesc').value = entry ? entry.desc : '';
+            chk.checked = entry ? !!entry.isDefault : false;
             titre.textContent = '💾 Mettre à jour le scénario';
             btnC.textContent  = 'Mettre à jour';
         } else {
             document.getElementById('modalNom').value = '';
             document.getElementById('modalDesc').value = '';
+            chk.checked = false;
             titre.textContent = '💾 Sauvegarder ce scénario';
             btnC.textContent  = 'Sauvegarder';
         }
@@ -1484,10 +1529,16 @@
     async function confirmerSauvegarde() {
         const nom  = document.getElementById('modalNom').value.trim();
         const desc = document.getElementById('modalDesc').value.trim();
+        const setDefault = document.getElementById('modalDefaut').checked;
         if (!nom) { document.getElementById('modalNom').focus(); return; }
 
         const url     = buildURL();
         const journal = getJournal();
+
+        // Si coché par défaut, retirer le flag des autres
+        if (setDefault) {
+            journal.forEach(e => e.isDefault = false);
+        }
 
         if (_scenarioActifId) {
             const idx = journal.findIndex(e => e.id === _scenarioActifId);
@@ -1496,6 +1547,7 @@
                 journal[idx].desc = desc;
                 journal[idx].url  = url;
                 journal[idx].date = new Date().toLocaleString('fr-CA');
+                if (setDefault) journal[idx].isDefault = true;
             }
             setScenarioActif(_scenarioActifId, nom);
         } else {
@@ -1504,35 +1556,46 @@
                 nom,
                 desc,
                 url,
-                date: new Date().toLocaleString('fr-CA')
+                date: new Date().toLocaleString('fr-CA'),
+                isDefault: setDefault
             };
             journal.unshift(entry);
             setScenarioActif(entry.id, nom);
         }
 
+        // Mettre à jour les defaults DB si coché
+        if (setDefault) {
+            _defaultsFromDB = getCurrentValues();
+        }
+
         fermerModal();
-        await saveJournal(journal);
-        flashBtn('✓ Sauvegardé !');
+        await saveData();
+        flashBtn();
     }
 
-    function flashBtn(text) {
+    function getCurrentValues() {
+        const vals = {};
+        for (const [key, inputId] of Object.entries(PARAM_MAP)) {
+            const el = document.getElementById(inputId);
+            if (el) vals[key] = Number(el.value);
+        }
+        return vals;
+    }
+
+    function flashBtn() {
         const btn = document.getElementById('btnSauvegarder');
-        const orig = btn.textContent;
-        btn.textContent = text;
         btn.style.background = '#dcfce7';
         btn.style.borderColor = '#16a34a';
-        btn.style.color = '#15803d';
         setTimeout(() => {
-            btn.textContent = _scenarioActifId ? '💾 Mettre à jour' : '💾 Sauvegarder ce scénario';
             btn.style.background = '';
             btn.style.borderColor = '';
-            btn.style.color = '';
-        }, 2000);
+        }, 1500);
     }
 
     // —— Journal (npoint.io) ——
     const JOURNAL_API = 'https://api.npoint.io/ed5f7345a51a18969902';
     let _journalCache = [];
+    let _defaultsFromDB = null;
 
     function getJournal() {
         return _journalCache;
@@ -1541,28 +1604,70 @@
     async function loadJournal() {
         try {
             const res = await fetch(JOURNAL_API, { cache: 'no-store' });
-            _journalCache = await res.json();
-            if (!Array.isArray(_journalCache)) _journalCache = [];
+            const data = await res.json();
+            // Migration : ancien format (tableau) → nouveau format (objet)
+            if (Array.isArray(data)) {
+                _journalCache = data;
+                _defaultsFromDB = { ...DEFAULTS };
+                await saveData(); // migrer vers le nouveau format
+            } else if (data && data.scenarios) {
+                _journalCache = data.scenarios;
+                _defaultsFromDB = data.defaults || { ...DEFAULTS };
+            } else {
+                _journalCache = [];
+                _defaultsFromDB = { ...DEFAULTS };
+            }
         } catch (e) {
             _journalCache = [];
+            _defaultsFromDB = null;
         }
+
+        // Charger les valeurs par défaut DB si pas de params URL
+        if (!window.location.search && _defaultsFromDB) {
+            chargerValeursDepuisDefaults(_defaultsFromDB);
+        }
+
         // Si URL avec params, chercher le scénario correspondant
         if (window.location.search) {
             const currentURL = window.location.href;
             const match = _journalCache.find(e => e.url === currentURL);
             if (match) setScenarioActif(match.id, match.nom);
+        } else {
+            // Activer le scénario par défaut s'il existe
+            const defEntry = _journalCache.find(e => e.isDefault);
+            if (defEntry) {
+                setScenarioActif(defEntry.id, defEntry.nom);
+            } else {
+                setScenarioActif(null, null);
+            }
         }
         renderJournal();
     }
 
-    async function saveJournal(journal) {
-        _journalCache = journal;
+    function chargerValeursDepuisDefaults(vals) {
+        for (const [key, inputId] of Object.entries(PARAM_MAP)) {
+            if (vals[key] !== undefined) {
+                const el = document.getElementById(inputId);
+                if (el) el.value = vals[key];
+            }
+        }
+        if (vals.nbLots) {
+            document.getElementById('lotSlider').value = vals.nbLots;
+            document.getElementById('lotNumber').value = vals.nbLots;
+        }
+        mettreAJourTout();
+    }
+
+    async function saveData() {
         renderJournal();
         try {
             await fetch(JOURNAL_API, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(journal)
+                body: JSON.stringify({
+                    defaults: _defaultsFromDB || DEFAULTS,
+                    scenarios: _journalCache
+                })
             });
         } catch (e) {
             console.error('Erreur sauvegarde journal:', e);
@@ -1583,16 +1688,18 @@
             const li = document.createElement('li');
             li.className = 'journal-entry';
             const isActive = entry.id === _scenarioActifId;
+            const starClass = entry.isDefault ? 'active' : 'inactive';
+            const starChar  = entry.isDefault ? '⭐' : '☆';
             const descHtml = entry.desc ? ' — <span class="journal-entry-desc-text">' + esc(entry.desc) + '</span>' : '';
             li.innerHTML = `
+                <button class="star-btn ${starClass} admin-only" onclick="rendreDefaut(${idx})" title="Par défaut">${starChar}</button>
                 <div class="journal-entry-body">
                     <a class="journal-entry-name${isActive ? ' active' : ''}" href="#" onclick="chargerScenario(${idx}); return false;">${esc(entry.nom)}</a>${descHtml}
                     <div class="journal-entry-meta">${entry.date}</div>
                 </div>
                 <div class="journal-entry-actions">
-                    <button class="journal-btn" onclick="chargerScenario(${idx})">👁 Afficher</button>
-                    <button class="journal-btn admin-only" onclick="dupliquerScenario(${idx})">📋 Dupliquer</button>
-                    <button class="journal-btn danger admin-only" onclick="supprimerScenario(${idx})">✕ Supprimer</button>
+                    <button class="journal-btn-icon admin-only" onclick="dupliquerScenario(${idx})" title="Dupliquer">📋</button>
+                    <button class="journal-btn-icon danger admin-only" onclick="supprimerScenario(${idx})" title="Supprimer">🗑</button>
                 </div>
             `;
             list.appendChild(li);
@@ -1622,6 +1729,7 @@
         setScenarioActif(null, null);
         document.getElementById('modalNom').value  = 'Copie de ' + entry.nom;
         document.getElementById('modalDesc').value = entry.desc || '';
+        document.getElementById('modalDefaut').checked = false;
         document.getElementById('modalTitre').textContent = '💾 Sauvegarder ce scénario';
         document.getElementById('modalBtnConfirm').textContent = 'Sauvegarder';
         document.getElementById('modalPublier').classList.add('visible');
@@ -1631,9 +1739,48 @@
     async function supprimerScenario(idx) {
         const journal = getJournal();
         const removed = journal[idx];
+        // On ne touche pas à _defaultsFromDB même si c'était le scénario par défaut
         if (removed.id === _scenarioActifId) setScenarioActif(null, null);
         journal.splice(idx, 1);
-        await saveJournal(journal);
+        await saveData();
+    }
+
+    async function rendreDefaut(idx) {
+        const journal = getJournal();
+        const entry = journal[idx];
+        if (entry.isDefault) {
+            // Dé-cocher : retirer le flag
+            entry.isDefault = false;
+        } else {
+            // Cocher : retirer le flag des autres, mettre sur celui-ci
+            journal.forEach(e => e.isDefault = false);
+            entry.isDefault = true;
+            // Extraire les valeurs du scénario comme nouveaux defaults
+            const u = new URL(entry.url);
+            const p = u.searchParams;
+            const vals = {};
+            for (const key of Object.keys(PARAM_MAP)) {
+                if (p.has(key)) vals[key] = Number(p.get(key));
+            }
+            _defaultsFromDB = vals;
+        }
+        await saveData();
+        // Rafraîchir le label du scénario actif si c'est celui-ci
+        if (entry.id === _scenarioActifId) {
+            setScenarioActif(entry.id, entry.nom);
+        }
+    }
+
+    function dupliquerScenarioActif() {
+        if (!_scenarioActifId) return;
+        const idx = getJournal().findIndex(e => e.id === _scenarioActifId);
+        if (idx !== -1) dupliquerScenario(idx);
+    }
+
+    async function supprimerScenarioActif() {
+        if (!_scenarioActifId) return;
+        const idx = getJournal().findIndex(e => e.id === _scenarioActifId);
+        if (idx !== -1) await supprimerScenario(idx);
     }
 
     function mettreAJourTout() {
