@@ -821,7 +821,6 @@
         <span id="scenarioActif" style="font-size:14px; font-weight:700; color:#378ADD; display:none;"></span>
         <span id="headerActions" style="display:inline-flex; gap:4px; align-items:center;">
             <button class="btn-icon btn-icon-muted admin-only" id="btnSauvegarder" onclick="ouvrirSauvegarde()" title="Sauvegarder">💾</button>
-            <button class="btn-icon admin-only" id="btnDupliquerHeader" onclick="dupliquerScenarioActif()" title="Dupliquer" style="display:none;">📋</button>
             <button class="btn-icon admin-only btn-icon-danger" id="btnSupprimerHeader" onclick="supprimerScenarioActif()" title="Supprimer" style="display:none;">🗑</button>
         </span>
     </div>
@@ -1494,23 +1493,19 @@
     function setScenarioActif(id, nom) {
         _scenarioActifId = id;
         const label  = document.getElementById('scenarioActif');
-        const btnDup = document.getElementById('btnDupliquerHeader');
         const btnDel = document.getElementById('btnSupprimerHeader');
         if (id) {
             const entry = getJournal().find(e => e.id === id);
             const icon = (entry && entry.isDefault) ? '⭐' : '📌';
             label.textContent = icon + ' ' + nom;
             label.style.display = '';
-            btnDup.style.display = '';
             btnDel.style.display = '';
         } else if (_defaultsFromDB) {
             label.textContent = '⭐ Valeurs par défaut';
             label.style.display = '';
-            btnDup.style.display = 'none';
             btnDel.style.display = 'none';
         } else {
             label.style.display = 'none';
-            btnDup.style.display = 'none';
             btnDel.style.display = 'none';
         }
     }
@@ -1619,10 +1614,25 @@
     }
 
     async function sauvegarderCommeNouveau() {
-        const nom  = document.getElementById('modalNom').value.trim();
+        const nomInput = document.getElementById('modalNom');
+        const nom  = nomInput.value.trim();
         const desc = document.getElementById('modalDesc').value.trim();
         const setDefault = document.getElementById('modalDefaut').checked;
-        if (!nom) { document.getElementById('modalNom').focus(); return; }
+        if (!nom) { nomInput.focus(); return; }
+
+        // Vérifier unicité du nom
+        if (getJournal().some(e => e.nom.toLowerCase() === nom.toLowerCase())) {
+            nomInput.style.borderColor = '#dc2626';
+            nomInput.setCustomValidity('Un scénario avec ce nom existe déjà');
+            nomInput.reportValidity();
+            nomInput.focus();
+            nomInput.addEventListener('input', function reset() {
+                nomInput.style.borderColor = '';
+                nomInput.setCustomValidity('');
+                nomInput.removeEventListener('input', reset);
+            });
+            return;
+        }
 
         const url     = buildURL();
         const journal = getJournal();
@@ -1779,7 +1789,6 @@
                     <div class="journal-entry-meta">${entry.date}</div>
                 </div>
                 <div class="journal-entry-actions">
-                    <button class="journal-btn-icon admin-only" onclick="dupliquerScenario(${idx})" title="Dupliquer">📋</button>
                     <button class="journal-btn-icon danger admin-only" onclick="supprimerScenario(${idx})" title="Supprimer">🗑</button>
                 </div>
             `;
@@ -1800,21 +1809,6 @@
         setScenarioActif(entry.id, entry.nom);
         renderJournal();
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    function dupliquerScenario(idx) {
-        const journal = getJournal();
-        const entry = journal[idx];
-        chargerValeursDepuisURL(entry.url);
-        _scenarioActifId = null;
-        setScenarioActif(null, null);
-        document.getElementById('modalNom').value  = 'Copie de ' + entry.nom;
-        document.getElementById('modalDesc').value = entry.desc || '';
-        document.getElementById('modalDefaut').checked = false;
-        document.getElementById('modalTitre').textContent = '💾 Sauvegarder ce scénario';
-        document.getElementById('modalBtnConfirm').textContent = 'Sauvegarder';
-        document.getElementById('modalPublier').classList.add('visible');
-        document.getElementById('modalNom').focus();
     }
 
     async function supprimerScenario(idx) {
@@ -1850,12 +1844,6 @@
         if (entry.id === _scenarioActifId) {
             setScenarioActif(entry.id, entry.nom);
         }
-    }
-
-    function dupliquerScenarioActif() {
-        if (!_scenarioActifId) return;
-        const idx = getJournal().findIndex(e => e.id === _scenarioActifId);
-        if (idx !== -1) dupliquerScenario(idx);
     }
 
     async function supprimerScenarioActif() {
