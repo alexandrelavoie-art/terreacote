@@ -1539,7 +1539,7 @@
 
     async function loadJournal() {
         try {
-            const res = await fetch(JOURNAL_API);
+            const res = await fetch(JOURNAL_API, { cache: 'no-store' });
             _journalCache = await res.json();
             if (!Array.isArray(_journalCache)) _journalCache = [];
         } catch (e) {
