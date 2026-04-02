@@ -1347,7 +1347,7 @@
         if (e.target === e.currentTarget) fermerModal();
     });
 
-    function confirmerPublication() {
+    async function confirmerPublication() {
         const nom  = document.getElementById('modalNom').value.trim();
         const desc = document.getElementById('modalDesc').value.trim();
         if (!nom) { document.getElementById('modalNom').focus(); return; }
@@ -1361,12 +1361,10 @@
             date: new Date().toLocaleString('fr-CA')
         };
 
-        const journal = JSON.parse(localStorage.getItem('journal_scenarios') || '[]');
+        const journal = getJournal();
         journal.unshift(entry);
-        localStorage.setItem('journal_scenarios', JSON.stringify(journal));
-
         fermerModal();
-        renderJournal();
+        await saveJournal(journal);
 
         // Copier le lien
         navigator.clipboard.writeText(url).then(() => {
@@ -1385,13 +1383,37 @@
         });
     }
 
-    // —— Journal ——
+    // —— Journal (npoint.io) ——
+    const JOURNAL_API = 'https://api.npoint.io/ed5f7345a51a18969902';
+    let _journalCache = [];
+
     function getJournal() {
-        return JSON.parse(localStorage.getItem('journal_scenarios') || '[]');
+        return _journalCache;
     }
 
-    function saveJournal(journal) {
-        localStorage.setItem('journal_scenarios', JSON.stringify(journal));
+    async function loadJournal() {
+        try {
+            const res = await fetch(JOURNAL_API);
+            _journalCache = await res.json();
+            if (!Array.isArray(_journalCache)) _journalCache = [];
+        } catch (e) {
+            _journalCache = [];
+        }
+        renderJournal();
+    }
+
+    async function saveJournal(journal) {
+        _journalCache = journal;
+        renderJournal();
+        try {
+            await fetch(JOURNAL_API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(journal)
+            });
+        } catch (e) {
+            console.error('Erreur sauvegarde journal:', e);
+        }
     }
 
     function renderJournal() {
@@ -1434,12 +1456,12 @@
         return d.innerHTML;
     }
 
-    function editJournalField(el) {
+    async function editJournalField(el) {
         const journal = getJournal();
         const idx   = parseInt(el.dataset.idx);
         const field = el.dataset.field;
         journal[idx][field] = el.value.trim();
-        saveJournal(journal);
+        await saveJournal(journal);
     }
 
     function copierLien(idx) {
@@ -1452,11 +1474,10 @@
         window.location.href = journal[idx].url;
     }
 
-    function supprimerScenario(idx) {
+    async function supprimerScenario(idx) {
         const journal = getJournal();
         journal.splice(idx, 1);
-        saveJournal(journal);
-        renderJournal();
+        await saveJournal(journal);
     }
 
     function mettreAJourTout() {
@@ -1524,7 +1545,7 @@
     });
 
     mettreAJourTout();
-    renderJournal();
+    loadJournal();
 </script>
 </body>
 </html>
