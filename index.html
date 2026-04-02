@@ -616,8 +616,8 @@
             font-size: 10px; color: #b0b0b0; width: 100%;
         }
         .journal-entry-actions {
-            display: flex; flex-direction: column; gap: 4px;
-            flex-shrink: 0; padding-top: 2px;
+            display: flex; flex-direction: row; gap: 4px;
+            flex-shrink: 0; align-items: center;
         }
         .journal-btn {
             font-size: 11px; padding: 2px 8px; border-radius: 4px;
@@ -1588,7 +1588,8 @@
                     <a class="journal-entry-name${isActive ? ' active' : ''}" href="#" onclick="chargerScenario(${idx}); return false;">${esc(entry.nom)}</a>${descHtml}
                     <div class="journal-entry-meta">${entry.date}</div>
                 </div>
-                <div class="journal-entry-actions admin-only">
+                <div class="journal-entry-actions">
+                    <button class="journal-btn" onclick="chargerScenario(${idx})">👁 Afficher</button>
                     <button class="journal-btn" onclick="dupliquerScenario(${idx})">📋 Dupliquer</button>
                     <button class="journal-btn danger" onclick="supprimerScenario(${idx})">✕ Supprimer</button>
                 </div>
