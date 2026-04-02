@@ -1569,6 +1569,20 @@
         const nom  = document.getElementById('modalNom').value.trim();
         const desc = document.getElementById('modalDesc').value.trim();
         const setDefault = document.getElementById('modalDefaut').checked;
+
+        // Si "par défaut" coché sans nom → juste mettre à jour le scénario masqué
+        if (setDefault && !nom) {
+            const journal = getJournal();
+            journal.forEach(e => e.isDefault = false);
+            _defaultsFromDB = getCurrentValues();
+            setScenarioActif(null, null);
+            fermerModal();
+            _referenceValues = getCurrentValues();
+            await saveData();
+            flashBtn();
+            return;
+        }
+
         if (!nom) { document.getElementById('modalNom').focus(); return; }
 
         const url     = buildURL();
@@ -1618,6 +1632,21 @@
         const nom  = nomInput.value.trim();
         const desc = document.getElementById('modalDesc').value.trim();
         const setDefault = document.getElementById('modalDefaut').checked;
+
+        // Si "par défaut" coché sans nom → juste mettre à jour le scénario masqué
+        if (setDefault && !nom) {
+            const journal = getJournal();
+            journal.forEach(e => e.isDefault = false);
+            _defaultsFromDB = getCurrentValues();
+            _scenarioActifId = null;
+            setScenarioActif(null, null);
+            fermerModal();
+            _referenceValues = getCurrentValues();
+            await saveData();
+            flashBtn();
+            return;
+        }
+
         if (!nom) { nomInput.focus(); return; }
 
         // Vérifier unicité du nom
