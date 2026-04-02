@@ -572,6 +572,15 @@
         }
         .btn-icon:hover { background: #f1f5f9; border-color: #94a3b8; }
         .btn-icon-danger:hover { background: #fef2f2; border-color: #fca5a5; }
+        .btn-icon.btn-icon-muted { opacity: .35; }
+        .btn-icon.btn-icon-changed {
+            background: #dbeafe; border-color: #378ADD;
+            animation: pulse-save .8s ease-in-out 1;
+        }
+        @keyframes pulse-save {
+            0%, 100% { box-shadow: none; }
+            50% { box-shadow: 0 0 0 4px rgba(55,138,221,.2); }
+        }
         /* —— Journal de publication —— */
         .journal-section {
             margin-top: 1rem;
@@ -688,6 +697,8 @@
         }
         .modal-btn-cancel { background: white; border-color: #cbd5e1; color: #64748b; }
         .modal-btn-cancel:hover { background: #f1f5f9; }
+        .modal-btn-new { background: white; border-color: #378ADD; color: #378ADD; }
+        .modal-btn-new:hover { background: #eff6ff; }
         .modal-btn-confirm { background: #378ADD; border-color: #378ADD; color: white; }
         .modal-btn-confirm:hover { background: #2b6fb5; }
 
@@ -809,7 +820,7 @@
         <h1>Calculateur de budget — Projet de lotissement</h1>
         <span id="scenarioActif" style="font-size:14px; font-weight:700; color:#378ADD; display:none;"></span>
         <span id="headerActions" style="display:inline-flex; gap:4px; align-items:center;">
-            <button class="btn-icon admin-only" id="btnSauvegarder" onclick="ouvrirSauvegarde()" title="Sauvegarder">💾</button>
+            <button class="btn-icon btn-icon-muted admin-only" id="btnSauvegarder" onclick="ouvrirSauvegarde()" title="Sauvegarder">💾</button>
             <button class="btn-icon admin-only" id="btnDupliquerHeader" onclick="dupliquerScenarioActif()" title="Dupliquer" style="display:none;">📋</button>
             <button class="btn-icon admin-only btn-icon-danger" id="btnSupprimerHeader" onclick="supprimerScenarioActif()" title="Supprimer" style="display:none;">🗑</button>
         </span>
@@ -1138,6 +1149,7 @@
         </div>
         <div class="modal-buttons">
             <button class="modal-btn modal-btn-cancel" onclick="fermerModal()">Annuler</button>
+            <button class="modal-btn modal-btn-new" id="modalBtnNew" onclick="sauvegarderCommeNouveau()" style="display:none;">Nouveau scénario</button>
             <button class="modal-btn modal-btn-confirm" id="modalBtnConfirm" onclick="confirmerSauvegarde()">Sauvegarder</button>
         </div>
     </div>
@@ -1450,6 +1462,32 @@
         return window.location.origin + window.location.pathname + '?' + params.toString();
     }
 
+    // —— Détection de changements ——
+    let _referenceValues = null;
+
+    function verifierChangements() {
+        const btn = document.getElementById('btnSauvegarder');
+        if (!_referenceValues) {
+            btn.classList.add('btn-icon-muted');
+            btn.classList.remove('btn-icon-changed');
+            btn.title = 'Sauvegarder';
+            return;
+        }
+        const current = getCurrentValues();
+        const changed = Object.keys(_referenceValues).some(k =>
+            Number(_referenceValues[k]) !== Number(current[k])
+        );
+        if (changed) {
+            btn.classList.remove('btn-icon-muted');
+            btn.classList.add('btn-icon-changed');
+            btn.title = 'Sauvegarder les changements';
+        } else {
+            btn.classList.add('btn-icon-muted');
+            btn.classList.remove('btn-icon-changed');
+            btn.title = 'Sauvegarder';
+        }
+    }
+
     // —— Scénario actif ——
     let _scenarioActifId = null;
 
@@ -1480,10 +1518,12 @@
     function chargerValeursDepuisURL(url) {
         const u = new URL(url);
         const p = u.searchParams;
+        const ref = {};
         for (const [key, inputId] of Object.entries(PARAM_MAP)) {
             if (p.has(key)) {
                 const el = document.getElementById(inputId);
                 if (el) el.value = p.get(key);
+                ref[key] = Number(p.get(key));
             }
         }
         const nb = p.get('nbLots');
@@ -1491,6 +1531,7 @@
             document.getElementById('lotSlider').value = nb;
             document.getElementById('lotNumber').value = nb;
         }
+        _referenceValues = ref;
         mettreAJourTout();
     }
 
@@ -1499,6 +1540,7 @@
         const modal = document.getElementById('modalPublier');
         const titre = document.getElementById('modalTitre');
         const btnC  = document.getElementById('modalBtnConfirm');
+        const btnN  = document.getElementById('modalBtnNew');
         const chk   = document.getElementById('modalDefaut');
         if (_scenarioActifId) {
             const entry = getJournal().find(e => e.id === _scenarioActifId);
@@ -1507,12 +1549,14 @@
             chk.checked = entry ? !!entry.isDefault : false;
             titre.textContent = '💾 Mettre à jour le scénario';
             btnC.textContent  = 'Mettre à jour';
+            btnN.style.display = '';
         } else {
             document.getElementById('modalNom').value = '';
             document.getElementById('modalDesc').value = '';
             chk.checked = false;
             titre.textContent = '💾 Sauvegarder ce scénario';
             btnC.textContent  = 'Sauvegarder';
+            btnN.style.display = 'none';
         }
         modal.classList.add('visible');
         document.getElementById('modalNom').focus();
@@ -1569,6 +1613,42 @@
         }
 
         fermerModal();
+        _referenceValues = getCurrentValues();
+        await saveData();
+        flashBtn();
+    }
+
+    async function sauvegarderCommeNouveau() {
+        const nom  = document.getElementById('modalNom').value.trim();
+        const desc = document.getElementById('modalDesc').value.trim();
+        const setDefault = document.getElementById('modalDefaut').checked;
+        if (!nom) { document.getElementById('modalNom').focus(); return; }
+
+        const url     = buildURL();
+        const journal = getJournal();
+
+        if (setDefault) {
+            journal.forEach(e => e.isDefault = false);
+        }
+
+        const entry = {
+            id: Date.now(),
+            nom,
+            desc,
+            url,
+            date: new Date().toLocaleString('fr-CA'),
+            isDefault: setDefault
+        };
+        journal.unshift(entry);
+        _scenarioActifId = null;
+        setScenarioActif(entry.id, nom);
+
+        if (setDefault) {
+            _defaultsFromDB = getCurrentValues();
+        }
+
+        fermerModal();
+        _referenceValues = getCurrentValues();
         await saveData();
         flashBtn();
     }
@@ -1655,6 +1735,7 @@
             document.getElementById('lotSlider').value = vals.nbLots;
             document.getElementById('lotNumber').value = vals.nbLots;
         }
+        _referenceValues = { ...vals };
         mettreAJourTout();
     }
 
@@ -1787,6 +1868,7 @@
         mettreAJourBilans();
         mettreAJourDonut();
         mettreAJourAlerte();
+        verifierChangements();
     }
 
     // —— Sync lots ——
