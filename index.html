@@ -599,22 +599,21 @@
         .journal-entry:last-child { border-bottom: none; }
         .journal-entry:hover { background: #fafbfc; }
         .journal-entry-body { flex: 1; min-width: 0; }
+        .journal-entry-body {
+            display: flex; align-items: baseline; gap: .4rem;
+            flex: 1; min-width: 0; flex-wrap: wrap;
+        }
         .journal-entry-name {
-            font-size: 13px; font-weight: 700; color: #1a1a1a;
-            border: none; background: transparent; padding: 0; width: 100%;
-            font-family: inherit; outline: none;
+            font-size: 13px; font-weight: 700; color: #378ADD;
+            cursor: pointer; text-decoration: none;
         }
-        .journal-entry-name:hover { background: #f1f5f9; border-radius: 3px; }
-        .journal-entry-name:focus { background: #eff6ff; border-radius: 3px; }
-        .journal-entry-desc {
+        .journal-entry-name:hover { text-decoration: underline; }
+        .journal-entry-name.active { color: #1d4ed8; }
+        .journal-entry-desc-text {
             font-size: 12px; color: #64748b;
-            border: none; background: transparent; padding: 0; width: 100%;
-            font-family: inherit; outline: none; margin-top: 2px; resize: none;
         }
-        .journal-entry-desc:hover { background: #f1f5f9; border-radius: 3px; }
-        .journal-entry-desc:focus { background: #eff6ff; border-radius: 3px; }
         .journal-entry-meta {
-            font-size: 10px; color: #b0b0b0; margin-top: 3px;
+            font-size: 10px; color: #b0b0b0; width: 100%;
         }
         .journal-entry-actions {
             display: flex; flex-direction: column; gap: 4px;
@@ -669,15 +668,60 @@
         .modal-btn-confirm { background: #378ADD; border-color: #378ADD; color: white; }
         .modal-btn-confirm:hover { background: #2b6fb5; }
 
+        /* —— Popup rôle —— */
+        .role-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,.55);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 2000;
+        }
+        .role-box {
+            background: white; border-radius: 14px; padding: 2rem 2.2rem;
+            width: 420px; max-width: 92vw; text-align: center;
+            box-shadow: 0 16px 48px rgba(0,0,0,.25);
+        }
+        .role-box h2 { font-size: 18px; margin-bottom: .3rem; color: #1a1a1a; }
+        .role-box p  { font-size: 13px; color: #666; margin-bottom: 1.2rem; }
+        .role-buttons { display: flex; gap: .75rem; justify-content: center; }
+        .role-btn {
+            flex: 1; padding: .7rem .5rem; border-radius: 10px; cursor: pointer;
+            border: 2px solid #e2e8f0; background: #fafbfc; transition: all .2s;
+            display: flex; flex-direction: column; align-items: center; gap: .3rem;
+        }
+        .role-btn:hover { border-color: #378ADD; background: #eff6ff; }
+        .role-btn .role-icon { font-size: 28px; }
+        .role-btn .role-label { font-size: 14px; font-weight: 700; color: #1a1a1a; }
+        .role-btn .role-desc  { font-size: 11px; color: #888; line-height: 1.3; }
+        .role-pw {
+            margin-top: 1rem; display: none; text-align: left;
+        }
+        .role-pw label { font-size: 12px; font-weight: 600; color: #555; display: block; margin-bottom: 4px; }
+        .role-pw input {
+            width: 100%; padding: 7px 10px; border: 1.5px solid #d5d5d5;
+            border-radius: 6px; font-size: 13px; font-family: inherit;
+        }
+        .role-pw input:focus { outline: none; border-color: #378ADD; box-shadow: 0 0 0 2px rgba(55,138,221,.15); }
+        .role-pw .pw-error { color: #dc2626; font-size: 12px; margin-top: 4px; display: none; }
+        .role-pw .pw-actions { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .6rem; }
+        .role-pw .pw-actions button {
+            padding: 5px 14px; border-radius: 6px; font-size: 13px;
+            font-weight: 600; cursor: pointer; border: 1.5px solid; transition: all .15s;
+        }
+        .role-pw .pw-btn-cancel { background: white; border-color: #cbd5e1; color: #64748b; }
+        .role-pw .pw-btn-ok { background: #378ADD; border-color: #378ADD; color: white; }
+        .role-pw .pw-btn-ok:hover { background: #2b6fb5; }
+
+        /* Éléments masqués en mode visiteur */
+        body.visiteur .admin-only { display: none !important; }
+
         @media print { body { background: white; padding: 0; } }
     </style>
 </head>
 <body>
 <div class="container">
-    <div style="display:flex; align-items:baseline; gap:1rem; margin-bottom:.1rem;">
+    <div style="display:flex; align-items:center; gap:1rem; margin-bottom:.1rem; flex-wrap:wrap;">
         <h1>Calculateur de budget — Projet de lotissement</h1>
-        <button class="btn-reset" onclick="resetValeurs()">↺ Réinitialiser</button>
-        <button class="btn-reset" id="btnPartager" onclick="partagerURL()">📤 Partager ce scénario</button>
+        <span id="scenarioActif" style="font-size:13px; font-weight:600; color:#378ADD; display:none;"></span>
+        <button class="btn-reset" id="btnSauvegarder" onclick="ouvrirSauvegarde()">💾 Sauvegarder ce scénario</button>
     </div>
     <p class="subtitle">Analysez la viabilité financière selon le nombre de lots vendus</p>
 
@@ -970,26 +1014,26 @@
         </div><!-- /right-col -->
     </div><!-- /main-grid -->
 
-    <!-- —— JOURNAL DE PUBLICATION —— -->
+    <!-- —— JOURNAL DES SCÉNARIOS —— -->
     <div class="journal-section" id="journalSection">
         <div class="journal-header">
-            <h2>📋 Journal des scénarios publiés</h2>
+            <h2>📋 Journal des scénarios</h2>
             <span class="journal-count" id="journalCount">0</span>
         </div>
         <div id="journalBody">
-            <div class="journal-empty" id="journalEmpty">Aucun scénario publié pour le moment.</div>
+            <div class="journal-empty" id="journalEmpty">Aucun scénario sauvegardé pour le moment.</div>
             <ul class="journal-list" id="journalList"></ul>
         </div>
     </div>
 
 </div><!-- /container -->
 
-<!-- —— MODALE DE PUBLICATION —— -->
+<!-- —— MODALE DE SAUVEGARDE —— -->
 <div class="modal-overlay" id="modalPublier">
     <div class="modal-box">
-        <h3>📤 Publier ce scénario</h3>
+        <h3 id="modalTitre">💾 Sauvegarder ce scénario</h3>
         <div class="modal-field">
-            <label for="modalNom">Nom du scénario</label>
+            <label for="modalNom">Nom du scénario *</label>
             <input type="text" id="modalNom" placeholder="Ex: Scénario 18 lots optimiste">
         </div>
         <div class="modal-field">
@@ -998,7 +1042,7 @@
         </div>
         <div class="modal-buttons">
             <button class="modal-btn modal-btn-cancel" onclick="fermerModal()">Annuler</button>
-            <button class="modal-btn modal-btn-confirm" onclick="confirmerPublication()">Publier</button>
+            <button class="modal-btn modal-btn-confirm" id="modalBtnConfirm" onclick="confirmerSauvegarde()">Sauvegarder</button>
         </div>
     </div>
 </div>
@@ -1290,27 +1334,6 @@
             div.innerHTML = s('#f0fdf4','#22c55e','#14532d', `<strong>✅ Budget suffisant</strong> — ${fmt(budgetAssocNet)} disponibles après le chemin`);
     }
 
-    function resetValeurs() {
-        const ids = {
-            prixLot: DEFAULTS.prixLot, nbLotsInput: DEFAULTS.nbLots,
-            prixDemiLot: DEFAULTS.prixDemiLot, nbDemiLots: DEFAULTS.nbDemiLots,
-            autresRevenus: DEFAULTS.autresRevenus, coutTerre: DEFAULTS.coutTerre,
-            arpentage: DEFAULTS.arpentage, biologiste: DEFAULTS.biologiste,
-            autresCoutsAmenagement: DEFAULTS.autresCoutsAmenagement,
-            chemin: DEFAULTS.chemin, autresCouts: DEFAULTS.autresCouts,
-            partFRICHE: DEFAULTS.partFRICHE, partAssociation: DEFAULTS.partAssociation
-        };
-        Object.entries(ids).forEach(([id, val]) => {
-            const el = document.getElementById(id);
-            if (el) el.value = val;
-        });
-        document.getElementById('lotSlider').value = DEFAULTS.nbLots;
-        document.getElementById('lotNumber').value  = DEFAULTS.nbLots;
-        // Remove URL params on reset
-        window.history.replaceState({}, '', window.location.pathname);
-        mettreAJourTout();
-    }
-
     // —— Helpers URL params ——
     const PARAM_MAP = {
         prixLot: 'prixLot', nbLots: 'lotNumber',
@@ -1331,11 +1354,58 @@
         return window.location.origin + window.location.pathname + '?' + params.toString();
     }
 
-    // —— Modale de publication ——
-    function partagerURL() {
-        document.getElementById('modalNom').value = '';
-        document.getElementById('modalDesc').value = '';
-        document.getElementById('modalPublier').classList.add('visible');
+    // —— Scénario actif ——
+    let _scenarioActifId = null;
+
+    function setScenarioActif(id, nom) {
+        _scenarioActifId = id;
+        const label = document.getElementById('scenarioActif');
+        const btn   = document.getElementById('btnSauvegarder');
+        if (id) {
+            label.textContent = '📌 ' + nom;
+            label.style.display = '';
+            btn.textContent = '💾 Mettre à jour';
+        } else {
+            label.style.display = 'none';
+            btn.textContent = '💾 Sauvegarder ce scénario';
+        }
+    }
+
+    function chargerValeursDepuisURL(url) {
+        const u = new URL(url);
+        const p = u.searchParams;
+        for (const [key, inputId] of Object.entries(PARAM_MAP)) {
+            if (p.has(key)) {
+                const el = document.getElementById(inputId);
+                if (el) el.value = p.get(key);
+            }
+        }
+        const nb = p.get('nbLots');
+        if (nb) {
+            document.getElementById('lotSlider').value = nb;
+            document.getElementById('lotNumber').value = nb;
+        }
+        mettreAJourTout();
+    }
+
+    // —— Modale de sauvegarde ——
+    function ouvrirSauvegarde() {
+        const modal = document.getElementById('modalPublier');
+        const titre = document.getElementById('modalTitre');
+        const btnC  = document.getElementById('modalBtnConfirm');
+        if (_scenarioActifId) {
+            const entry = getJournal().find(e => e.id === _scenarioActifId);
+            document.getElementById('modalNom').value  = entry ? entry.nom : '';
+            document.getElementById('modalDesc').value = entry ? entry.desc : '';
+            titre.textContent = '💾 Mettre à jour le scénario';
+            btnC.textContent  = 'Mettre à jour';
+        } else {
+            document.getElementById('modalNom').value = '';
+            document.getElementById('modalDesc').value = '';
+            titre.textContent = '💾 Sauvegarder ce scénario';
+            btnC.textContent  = 'Sauvegarder';
+        }
+        modal.classList.add('visible');
         document.getElementById('modalNom').focus();
     }
 
@@ -1347,40 +1417,53 @@
         if (e.target === e.currentTarget) fermerModal();
     });
 
-    async function confirmerPublication() {
+    async function confirmerSauvegarde() {
         const nom  = document.getElementById('modalNom').value.trim();
         const desc = document.getElementById('modalDesc').value.trim();
         if (!nom) { document.getElementById('modalNom').focus(); return; }
 
-        const url = buildURL();
-        const entry = {
-            id: Date.now(),
-            nom,
-            desc,
-            url,
-            date: new Date().toLocaleString('fr-CA')
-        };
-
+        const url     = buildURL();
         const journal = getJournal();
-        journal.unshift(entry);
+
+        if (_scenarioActifId) {
+            const idx = journal.findIndex(e => e.id === _scenarioActifId);
+            if (idx !== -1) {
+                journal[idx].nom  = nom;
+                journal[idx].desc = desc;
+                journal[idx].url  = url;
+                journal[idx].date = new Date().toLocaleString('fr-CA');
+            }
+            setScenarioActif(_scenarioActifId, nom);
+        } else {
+            const entry = {
+                id: Date.now(),
+                nom,
+                desc,
+                url,
+                date: new Date().toLocaleString('fr-CA')
+            };
+            journal.unshift(entry);
+            setScenarioActif(entry.id, nom);
+        }
+
         fermerModal();
         await saveJournal(journal);
+        flashBtn('✓ Sauvegardé !');
+    }
 
-        // Copier le lien
-        navigator.clipboard.writeText(url).then(() => {
-            const btn = document.getElementById('btnPartager');
-            const orig = btn.textContent;
-            btn.textContent = '✓ Publié & copié !';
-            btn.style.background = '#dcfce7';
-            btn.style.borderColor = '#16a34a';
-            btn.style.color = '#15803d';
-            setTimeout(() => {
-                btn.textContent = orig;
-                btn.style.background = '';
-                btn.style.borderColor = '';
-                btn.style.color = '';
-            }, 2000);
-        });
+    function flashBtn(text) {
+        const btn = document.getElementById('btnSauvegarder');
+        const orig = btn.textContent;
+        btn.textContent = text;
+        btn.style.background = '#dcfce7';
+        btn.style.borderColor = '#16a34a';
+        btn.style.color = '#15803d';
+        setTimeout(() => {
+            btn.textContent = _scenarioActifId ? '💾 Mettre à jour' : '💾 Sauvegarder ce scénario';
+            btn.style.background = '';
+            btn.style.borderColor = '';
+            btn.style.color = '';
+        }, 2000);
     }
 
     // —— Journal (npoint.io) ——
@@ -1398,6 +1481,12 @@
             if (!Array.isArray(_journalCache)) _journalCache = [];
         } catch (e) {
             _journalCache = [];
+        }
+        // Si URL avec params, chercher le scénario correspondant
+        if (window.location.search) {
+            const currentURL = window.location.href;
+            const match = _journalCache.find(e => e.url === currentURL);
+            if (match) setScenarioActif(match.id, match.nom);
         }
         renderJournal();
     }
@@ -1429,20 +1518,15 @@
         journal.forEach((entry, idx) => {
             const li = document.createElement('li');
             li.className = 'journal-entry';
+            const isActive = entry.id === _scenarioActifId;
+            const descHtml = entry.desc ? ' — <span class="journal-entry-desc-text">' + esc(entry.desc) + '</span>' : '';
             li.innerHTML = `
-                <div style="font-size:16px; padding-top:2px;">📄</div>
                 <div class="journal-entry-body">
-                    <input class="journal-entry-name" value="${esc(entry.nom)}"
-                           data-idx="${idx}" data-field="nom"
-                           onchange="editJournalField(this)">
-                    <textarea class="journal-entry-desc" rows="1"
-                              data-idx="${idx}" data-field="desc"
-                              onchange="editJournalField(this)">${esc(entry.desc)}</textarea>
+                    <a class="journal-entry-name${isActive ? ' active' : ''}" href="#" onclick="chargerScenario(${idx}); return false;">${esc(entry.nom)}</a>${descHtml}
                     <div class="journal-entry-meta">${entry.date}</div>
                 </div>
                 <div class="journal-entry-actions">
-                    <button class="journal-btn" onclick="copierLien(${idx})">📋 Copier</button>
-                    <button class="journal-btn" onclick="chargerScenario(${idx})">⬇ Charger</button>
+                    <button class="journal-btn" onclick="dupliquerScenario(${idx})">📋 Dupliquer</button>
                     <button class="journal-btn danger" onclick="supprimerScenario(${idx})">✕ Supprimer</button>
                 </div>
             `;
@@ -1456,26 +1540,33 @@
         return d.innerHTML;
     }
 
-    async function editJournalField(el) {
-        const journal = getJournal();
-        const idx   = parseInt(el.dataset.idx);
-        const field = el.dataset.field;
-        journal[idx][field] = el.value.trim();
-        await saveJournal(journal);
-    }
-
-    function copierLien(idx) {
-        const journal = getJournal();
-        navigator.clipboard.writeText(journal[idx].url);
-    }
-
     function chargerScenario(idx) {
         const journal = getJournal();
-        window.location.href = journal[idx].url;
+        const entry = journal[idx];
+        chargerValeursDepuisURL(entry.url);
+        setScenarioActif(entry.id, entry.nom);
+        renderJournal();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function dupliquerScenario(idx) {
+        const journal = getJournal();
+        const entry = journal[idx];
+        chargerValeursDepuisURL(entry.url);
+        _scenarioActifId = null;
+        setScenarioActif(null, null);
+        document.getElementById('modalNom').value  = 'Copie de ' + entry.nom;
+        document.getElementById('modalDesc').value = entry.desc || '';
+        document.getElementById('modalTitre').textContent = '💾 Sauvegarder ce scénario';
+        document.getElementById('modalBtnConfirm').textContent = 'Sauvegarder';
+        document.getElementById('modalPublier').classList.add('visible');
+        document.getElementById('modalNom').focus();
     }
 
     async function supprimerScenario(idx) {
         const journal = getJournal();
+        const removed = journal[idx];
+        if (removed.id === _scenarioActifId) setScenarioActif(null, null);
         journal.splice(idx, 1);
         await saveJournal(journal);
     }
