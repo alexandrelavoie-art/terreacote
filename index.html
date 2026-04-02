@@ -712,6 +712,7 @@
 
         /* Éléments masqués en mode visiteur */
         body.visiteur .admin-only { display: none !important; }
+        .visiteur .admin-only { display: none !important; }
 
         @media print { body { background: white; padding: 0; } }
     </style>
@@ -1590,8 +1591,8 @@
                 </div>
                 <div class="journal-entry-actions">
                     <button class="journal-btn" onclick="chargerScenario(${idx})">👁 Afficher</button>
-                    <button class="journal-btn" onclick="dupliquerScenario(${idx})">📋 Dupliquer</button>
-                    <button class="journal-btn danger" onclick="supprimerScenario(${idx})">✕ Supprimer</button>
+                    <button class="journal-btn admin-only" onclick="dupliquerScenario(${idx})">📋 Dupliquer</button>
+                    <button class="journal-btn danger admin-only" onclick="supprimerScenario(${idx})">✕ Supprimer</button>
                 </div>
             `;
             list.appendChild(li);
