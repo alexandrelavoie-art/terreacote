@@ -44,13 +44,16 @@
         autresCouts : 0,
         partFRICHE      : 75,
         partAssociation : 25,
+        cheminPayePar   : 'asso',
     };
     // URL params override defaults
     const CONFIG = (() => {
         const p = new URLSearchParams(window.location.search);
         const c = { ...DEFAULTS };
         for (const key of Object.keys(DEFAULTS)) {
-            if (p.has(key)) c[key] = Number(p.get(key));
+            if (!p.has(key)) continue;
+            const raw = p.get(key);
+            c[key] = typeof DEFAULTS[key] === 'number' ? Number(raw) : raw;
         }
         return c;
     })();
@@ -659,6 +662,217 @@
         .star-btn.active { color: #f59e0b; }
         .star-btn.inactive { color: #cbd5e1; }
 
+        /* —— Toggle segmenté —— */
+        .seg-toggle {
+            display: inline-flex; gap: 0;
+            border: 1px solid #cbd5e1; border-radius: 6px;
+            background: #f1f5f9; overflow: hidden;
+            padding: 2px;
+        }
+        .seg-toggle .seg-btn {
+            padding: 4px 12px; border: none; background: transparent;
+            font-size: 11px; font-weight: 600; color: #94a3b8;
+            cursor: pointer; transition: background .15s, color .15s, box-shadow .15s;
+            border-radius: 4px;
+        }
+        .seg-toggle .seg-btn:hover { color: #475569; }
+        .seg-toggle .seg-btn.active {
+            color: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,.2);
+        }
+        .seg-toggle .seg-btn.active[data-payeur="asso"]   { background: #596F62; }
+        .seg-toggle .seg-btn.active[data-payeur="friche"] { background: #7E78D2; }
+        .bilan-flow-net {
+            font-size: 10px; color: #64748b; font-weight: 600;
+            margin-top: 2px; line-height: 1.2;
+        }
+
+        /* —— Onglets des scénarios —— */
+        .scenario-tabs {
+            display: flex; align-items: flex-end; gap: 2px;
+            margin: .6rem 0 0 0;
+            border-bottom: 2px solid #e2e8f0;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: thin;
+            min-height: 56px;
+        }
+        .scenario-tabs-empty {
+            font-size: 12px; color: #94a3b8;
+            padding: .5rem .25rem;
+            font-style: italic;
+        }
+        .scenario-tab {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: .35rem .65rem .4rem;
+            border: 1px solid #e2e8f0; border-bottom: none;
+            border-radius: 6px 6px 0 0;
+            background: #f8fafc;
+            color: #64748b; font-size: 12px; font-weight: 600;
+            white-space: nowrap;
+            margin-bottom: -2px;
+            transition: background .15s, color .15s;
+            max-width: 320px;
+        }
+        .scenario-tab:hover { background: #f1f5f9; color: #1e293b; }
+        .scenario-tab.active {
+            background: white;
+            color: #1d4ed8;
+            border-color: #cbd5e1;
+            border-bottom: 2px solid white;
+            position: relative;
+            z-index: 1;
+        }
+        .scenario-tab-star {
+            font-size: 13px; line-height: 1;
+            background: none; border: none; padding: 0 2px;
+            cursor: pointer; color: #cbd5e1;
+            transition: transform .15s, color .15s;
+            flex-shrink: 0;
+        }
+        .scenario-tab-star:hover { transform: scale(1.2); }
+        .scenario-tab-star.active { color: #f59e0b; }
+        .scenario-tab-content {
+            display: flex; flex-direction: column;
+            min-width: 0; line-height: 1.15;
+        }
+        .scenario-tab-name {
+            cursor: pointer; color: inherit; text-decoration: none;
+            font-weight: 700;
+            overflow: hidden; text-overflow: ellipsis;
+        }
+        .scenario-tab-name:hover { text-decoration: underline; }
+        .scenario-tab-desc {
+            font-size: 10px; font-weight: 400; font-style: italic;
+            color: #94a3b8;
+            overflow: hidden; text-overflow: ellipsis; max-width: 280px;
+        }
+        .scenario-tab.active .scenario-tab-desc { color: #64748b; }
+        .scenario-tab-delete {
+            border: none; background: none;
+            font-size: 14px; line-height: 1;
+            color: #cbd5e1; padding: 0 4px;
+            cursor: pointer; border-radius: 3px;
+            transition: color .15s, background .15s;
+        }
+        .scenario-tab-delete:hover { color: #dc2626; background: #fef2f2; }
+
+        /* —— Tableau comparatif des scénarios —— */
+        .comparaison-section {
+            margin-top: 1rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,.07);
+            overflow: hidden;
+        }
+        .comparaison-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: .5rem .75rem;
+            background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+        }
+        .comparaison-header h2 {
+            font-size: 13px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .04em; color: #64748b; margin: 0;
+        }
+        .comparaison-empty {
+            padding: 1.5rem; text-align: center;
+            font-size: 13px; color: #94a3b8;
+        }
+        .comparaison-scroll {
+            overflow-x: auto;
+        }
+        .comparaison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .comparaison-table th,
+        .comparaison-table td {
+            padding: .35rem .6rem;
+            border-bottom: 1px solid #f1f5f9;
+            text-align: right;
+            white-space: nowrap;
+        }
+        .comparaison-table thead th {
+            background: #f8fafc;
+            font-size: 11px;
+            font-weight: 700;
+            color: #1a1a1a;
+            border-bottom: 2px solid #e2e8f0;
+            position: sticky; top: 0;
+        }
+        .comparaison-table thead th .scen-default {
+            color: #f59e0b; margin-right: 2px;
+        }
+        .comparaison-table tbody tr:hover { background: #fafbfc; }
+        .comparaison-table .col-label {
+            text-align: left;
+            font-weight: 600;
+            color: #475569;
+            background: #fafbfc;
+            position: sticky; left: 0;
+            border-right: 1px solid #e2e8f0;
+        }
+        .comparaison-table th.col-label {
+            background: #f1f5f9;
+            z-index: 2;
+        }
+        .comparaison-table .col-active {
+            background: #eff6ff;
+        }
+        .comparaison-table tbody tr:hover .col-active {
+            background: #dbeafe;
+        }
+        .comparaison-table .row-section td,
+        .comparaison-table .row-section th {
+            background: #f8fafc;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: #94a3b8;
+            font-weight: 700;
+            text-align: left;
+            padding: .3rem .6rem;
+        }
+        /* Couleurs thématiques (mêmes que le calculateur) */
+        .comparaison-table .row-section.theme-revenus  td { background: #e8f7f9; color: #1a8a96; }
+        .comparaison-table .row-section.theme-amenag   td { background: #fdf6e3; color: #C07D1A; }
+        .comparaison-table .row-section.theme-asso     td { background: #f1f4f2; color: #596F62; }
+        .comparaison-table .row-section.theme-partage  td { background: #eef0f6; color: #25283D; }
+        .comparaison-table .row-section.theme-friche   td { background: #f0eff9; color: #7E78D2; }
+        .comparaison-table .row-section.theme-surplus  td { background: #eef0f6; color: #25283D; }
+        .comparaison-table tbody tr.theme-revenus td.col-label { color: #1a8a96; background: #f4fbfc; }
+        .comparaison-table tbody tr.theme-amenag  td.col-label { color: #C07D1A; background: #fefbf2; }
+        .comparaison-table tbody tr.theme-asso    td.col-label { color: #596F62; background: #f8faf9; }
+        .comparaison-table tbody tr.theme-partage td.col-label { color: #25283D; background: #f7f8fb; }
+        .comparaison-table tbody tr.theme-friche  td.col-label { color: #7E78D2; background: #f9f8fc; }
+        .comparaison-table tbody tr.theme-surplus td.col-label { color: #25283D; background: #f4f5f9; }
+        /* Ligne description */
+        .comparaison-table .row-desc td {
+            background: #fafbfc;
+            font-style: italic;
+            color: #475569;
+            font-size: 11px;
+            text-align: left;
+            white-space: normal;
+            border-bottom: 2px solid #e2e8f0;
+            padding: .5rem .6rem;
+            line-height: 1.35;
+        }
+        .comparaison-table .row-desc td.col-label {
+            font-style: normal;
+            font-weight: 600;
+            color: #475569;
+        }
+        .comparaison-table .row-desc td.col-active { background: #eff6ff; }
+        .comparaison-scen-link {
+            color: #378ADD;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .comparaison-scen-link:hover { text-decoration: underline; }
+        .comparaison-scen-link.active { color: #1d4ed8; }
+
         /* —— Modale —— */
         .modal-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,.4);
@@ -826,6 +1040,11 @@
     </div>
     <p class="subtitle">Analysez la viabilité financière selon le nombre de lots vendus</p>
 
+    <!-- —— ONGLETS DES SCÉNARIOS —— -->
+    <div class="scenario-tabs" id="scenarioTabs">
+        <div class="scenario-tabs-empty" id="scenarioTabsEmpty">Aucun scénario sauvegardé.</div>
+    </div>
+
     <div class="main-grid">
 
         <!-- —— COLONNE GAUCHE —— -->
@@ -968,13 +1187,26 @@
                         <!-- Ligne 3 : fork visuel — FRICH & Asso -->
                         <div style="display:flex; gap:.5rem; align-items:stretch;">
                             <div style="flex:1; background:#f0eff9; border-radius:6px; padding:.3rem .5rem; border-top:3px solid #7E78D2;">
-                                <div class="bilan-flow-label" style="color:#1a8a96;">FRICH (<span id="surplusPctFrichee">—</span> %)</div>
-                                <div class="bilan-flow-amount" id="surplusMontantFrichee" style="color:#1a8a96;">—</div>
+                                <div class="bilan-flow-label" style="color:#7E78D2;">FRICH (<span id="surplusPctFrichee">—</span> %)</div>
+                                <div class="bilan-flow-amount" id="surplusMontantFrichee" style="color:#7E78D2;">—</div>
+                                <div class="bilan-flow-net" id="bilFlowFricheNet" style="display:none;">après chemin : <span id="surplusFricheNet">—</span></div>
                             </div>
                             <div style="width:2px; background:linear-gradient(to bottom, #7E78D2 0%, #7E78D2 50%, transparent 50%); flex-shrink:0; margin-top:-8px;"></div>
                             <div style="flex:1; background:#f1f4f2; border-radius:6px; padding:.3rem .5rem; border-top:3px solid #596F62;">
                                 <div class="bilan-flow-label" style="color:#596F62;">Association (<span id="surplusPctAssoc">—</span> %)</div>
                                 <div class="bilan-flow-amount" id="surplusMontantAssoc" style="color:#596F62;">—</div>
+                            </div>
+                        </div>
+                        <!-- Ligne 4 : chemin + toggle qui paye -->
+                        <div style="display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin-top:.5rem; padding:.4rem .55rem; background:#fafaf9; border-radius:6px; border:1px dashed #cbd5e1;">
+                            <span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#596F62; white-space:nowrap;">🛣 Coût du chemin</span>
+                            <div class="field-pair" style="margin:0;">
+                                <input type="number" min="0" id="chemin" step="5000" style="width:90px;"><span class="unit">$</span>
+                            </div>
+                            <span style="font-size:11px; color:#64748b; margin-left:auto;">payé par</span>
+                            <div class="seg-toggle" id="cheminPayeurToggle" data-value="asso">
+                                <button type="button" data-payeur="asso" class="seg-btn active" onclick="setCheminPayeur('asso')">Association</button>
+                                <button type="button" data-payeur="friche" class="seg-btn" onclick="setCheminPayeur('friche')">FRICHE</button>
                             </div>
                         </div>
                     </div>
@@ -987,17 +1219,15 @@
                         <span class="status-dot" id="dot-chemin"></span>
                     </div>
                     <div class="section-body">
-                        <div style="display:grid; grid-template-columns:1fr auto 1fr auto 1fr auto 1fr; align-items:center; gap:.3rem .4rem;">
+                        <div id="cheminFlowGrid" style="display:grid; grid-template-columns:1fr auto 1fr auto 1fr auto 1fr; align-items:center; gap:.3rem .4rem;">
                             <div class="bilan-flow-cell" style="background:#f1f4f2; border-radius:6px; padding:.3rem .5rem;">
                                 <div class="bilan-flow-label">Budget reçu (asso)</div>
                                 <div class="bilan-flow-amount" style="color:#596F62;" id="surplusMontantAssocRef">—</div>
                             </div>
-                            <div class="bilan-flow-op" style="font-size:18px; color:#64748b;">−</div>
-                            <div class="bilan-flow-cell" style="background:#fafaf9; border-radius:6px; padding:.3rem .5rem;">
+                            <div class="bilan-flow-op" id="cheminFlowOp1" style="font-size:18px; color:#64748b;">−</div>
+                            <div class="bilan-flow-cell" id="cheminFlowChemin" style="background:#fafaf9; border-radius:6px; padding:.3rem .5rem;">
                                 <div class="bilan-flow-label">Coût du chemin</div>
-                                <div class="field-pair" style="justify-content:center; margin-top:2px;">
-                                    <input type="number" min="0" id="chemin" step="5000" style="width:80px;"><span class="unit">$</span>
-                                </div>
+                                <div class="bilan-flow-amount" style="color:#596F62;" id="cheminMontantAffiche">—</div>
                             </div>
                             <div class="bilan-flow-op" style="font-size:18px; color:#64748b;">−</div>
                             <div class="bilan-flow-cell" style="background:#fafaf9; border-radius:6px; padding:.3rem .5rem;">
@@ -1115,17 +1345,23 @@
         </div><!-- /right-col -->
     </div><!-- /main-grid -->
 
-    <!-- —— JOURNAL DES SCÉNARIOS —— -->
-    <div class="journal-section" id="journalSection">
-        <div class="journal-header">
-            <h2>📋 Journal des scénarios</h2>
-            <span class="journal-count" id="journalCount">0</span>
+    <!-- —— TABLEAU COMPARATIF DES SCÉNARIOS —— -->
+    <div class="comparaison-section" id="comparaisonSection">
+        <div class="comparaison-header">
+            <h2>📊 Comparaison des scénarios</h2>
+            <span class="journal-count" id="comparaisonCount">0</span>
         </div>
-        <div id="journalBody">
-            <div class="journal-empty" id="journalEmpty">Aucun scénario sauvegardé pour le moment.</div>
-            <ul class="journal-list" id="journalList"></ul>
+        <div id="comparaisonBody">
+            <div class="comparaison-empty" id="comparaisonEmpty">Aucun scénario à comparer.</div>
+            <div class="comparaison-scroll" id="comparaisonScroll" style="display:none;">
+                <table class="comparaison-table">
+                    <thead><tr id="comparaisonHead"></tr></thead>
+                    <tbody id="comparaisonBodyRows"></tbody>
+                </table>
+            </div>
         </div>
     </div>
+
 
 </div><!-- /container -->
 
@@ -1183,6 +1419,10 @@
             autresCouts : n('autresCouts'),
             partFRICHE : cl(n('partFRICHE'),    0, 100),
             partAssoc  : cl(n('partAssociation'), 0, 100),
+            cheminPayePar : (() => {
+                const t = document.getElementById('cheminPayeurToggle');
+                return (t && t.dataset.value) || CONFIG.cheminPayePar || 'asso';
+            })(),
         };
     }
 
@@ -1196,9 +1436,15 @@
         const surplus       = revenus - totalDepenses;
         const budgetFriche  = surplus > 0 ? Math.round(surplus * inp.partFRICHE / 100) : 0;
         const budgetAssoc   = surplus > 0 ? Math.round(surplus * inp.partAssoc  / 100) : 0;
-        // L'association paie ensuite chemin + autres coûts depuis sa part
-        const budgetAssocNet = budgetAssoc - inp.chemin - inp.autresCouts;
-        return { revenus, totalTerre, totalAmenag, totalDepenses, surplus, budgetAssoc, budgetAssocNet, budgetFriche };
+        // Le chemin est payé soit par l'asso, soit par la friche
+        const fricheChemin = inp.cheminPayePar === 'friche' ? inp.chemin : 0;
+        const assocChemin  = inp.cheminPayePar === 'friche' ? 0          : inp.chemin;
+        const budgetFricheNet = budgetFriche - fricheChemin;
+        const budgetAssocNet  = budgetAssoc  - assocChemin - inp.autresCouts;
+        return { revenus, totalTerre, totalAmenag, totalDepenses, surplus,
+                 budgetFriche, budgetFricheNet,
+                 budgetAssoc,  budgetAssocNet,
+                 fricheChemin, assocChemin };
     }
 
     // Lots nécessaires pour que les revenus couvrent un seuil cumulatif
@@ -1209,15 +1455,16 @@
         return Math.max(0, n);
     }
 
-    // Lots pour que le budget association couvre chemin + autres coûts
+    // Lots pour que la partie qui paie le chemin couvre ses coûts
     function seuilChemin(inp) {
         const fixed = inp.nbDemiLots * inp.prixDemiLot + inp.autresRevenus;
         const dep   = inp.coutTerre
                     + inp.arpentage + inp.biologiste + inp.autresCoutsAmenagement;
-        const cible = inp.chemin + inp.autresCouts;
+        const part  = inp.cheminPayePar === 'friche' ? inp.partFRICHE : inp.partAssoc;
+        const cible = inp.cheminPayePar === 'friche' ? inp.chemin : inp.chemin + inp.autresCouts;
         for (let i = 0; i <= 200; i++) {
             const s = i * inp.prixLot + fixed - dep;
-            if (s > 0 && Math.round(s * inp.partAssoc / 100) >= cible) return i;
+            if (s > 0 && Math.round(s * part / 100) >= cible) return i;
         }
         return null;
     }
@@ -1260,7 +1507,9 @@
 
     function mettreAJourBilans() {
         const inp = getInputs();
-        const { revenus, totalTerre, totalAmenag, totalDepenses, surplus, budgetAssoc, budgetAssocNet, budgetFriche } = calculer(inp.nbLots, inp);
+        const { revenus, totalTerre, totalAmenag, totalDepenses, surplus,
+                budgetAssoc, budgetAssocNet, budgetFriche, budgetFricheNet,
+                fricheChemin, assocChemin } = calculer(inp.nbLots, inp);
         document.getElementById('bilanRevenus').textContent = fmt(revenus);
 
         // Partage
@@ -1289,6 +1538,28 @@
         document.getElementById('surplusMontantFrichee').textContent = fmt(budgetFriche);
         document.getElementById('surplusMontantAssoc').textContent  = fmt(budgetAssoc);
 
+        // FRICHE net après chemin (si FRICHE paie)
+        const fricheNetEl  = document.getElementById('bilFlowFricheNet');
+        const fricheNetVal = document.getElementById('surplusFricheNet');
+        if (fricheNetEl) {
+            if (inp.cheminPayePar === 'friche' && inp.chemin > 0) {
+                fricheNetEl.style.display = 'block';
+                fricheNetVal.textContent = (budgetFricheNet < 0 ? '−' : '') + fmt(budgetFricheNet);
+                fricheNetVal.style.color = budgetFricheNet >= 0 ? '#15803d' : '#dc2626';
+            } else {
+                fricheNetEl.style.display = 'none';
+            }
+        }
+
+        // Toggle visuel
+        const toggle = document.getElementById('cheminPayeurToggle');
+        if (toggle) {
+            toggle.dataset.value = inp.cheminPayePar;
+            toggle.querySelectorAll('.seg-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.payeur === inp.cheminPayePar);
+            });
+        }
+
         // Part association — chemin & résultat
         const s2 = seuilChemin(inp);
         seuilBadge(s2, 'seuilSurplus');
@@ -1296,6 +1567,23 @@
         document.getElementById('surplusApresChemin').textContent  = (budgetAssocNet < 0 ? '−' : '') + fmt(budgetAssocNet);
         document.getElementById('surplusApresChemin').style.color  = budgetAssocNet >= 0 ? '#15803d' : '#dc2626';
         document.getElementById('surplusMontantAssocRef').textContent = fmt(budgetAssoc);
+        // Affichage conditionnel de la cellule chemin selon qui paie
+        const cheminCell = document.getElementById('cheminFlowChemin');
+        const cheminOp1  = document.getElementById('cheminFlowOp1');
+        const cheminMnt  = document.getElementById('cheminMontantAffiche');
+        const cheminGrid = document.getElementById('cheminFlowGrid');
+        if (cheminCell && cheminOp1 && cheminGrid) {
+            if (inp.cheminPayePar === 'asso') {
+                cheminCell.style.display = '';
+                cheminOp1.style.display = '';
+                cheminGrid.style.gridTemplateColumns = '1fr auto 1fr auto 1fr auto 1fr';
+                if (cheminMnt) cheminMnt.textContent = fmt(inp.chemin);
+            } else {
+                cheminCell.style.display = 'none';
+                cheminOp1.style.display = 'none';
+                cheminGrid.style.gridTemplateColumns = '1fr auto 1fr auto 1fr';
+            }
+        }
         // Color the surplus net cell background
         const netCell = document.getElementById('surplusNetCell');
         if (netCell) netCell.style.background = budgetAssocNet >= 0 ? '#dcfce7' : '#fee2e2';
@@ -1304,7 +1592,9 @@
         const okPartage  = ptotal === 100;
         const okDepenses = revenus >= cumulA;
         const okBilan    = surplus > 0;
-        const okChemin   = budgetAssoc >= inp.chemin;
+        const okChemin   = inp.cheminPayePar === 'friche'
+                            ? budgetFriche >= inp.chemin
+                            : budgetAssoc  >= inp.chemin;
         const okSurplus  = budgetAssocNet >= 0;
 
         setStatut('revenus',  null);
@@ -1331,7 +1621,8 @@
         bcAmt('terre',   true, totalTerre);
         // Aménagement : total arpentage+biologiste+autres (regroupé)
         bcAmt('amenag',  okDepenses, totalAmenag > 0 ? totalAmenag : 0);
-        bcAmt('chemin',  okChemin,   okChemin   ? inp.chemin : inp.chemin - budgetAssoc);
+        const cheminPayeur = inp.cheminPayePar === 'friche' ? budgetFriche : budgetAssoc;
+        bcAmt('chemin',  okChemin,   okChemin   ? inp.chemin : inp.chemin - cheminPayeur);
         // Seuils (lots minimum)
         bcSeuil('terre',  s1);
         bcSeuil('amenag', s1);
@@ -1341,10 +1632,12 @@
         document.getElementById('bc-surplus-assoc-pct').textContent  = 'Asso ' + inp.partAssoc + '%';
         const amtFriche = document.getElementById('bc-amt-friche');
         const amtAssoc  = document.getElementById('bc-amt-surplus');
+        const fricheOk  = surplus > 0 && budgetFricheNet >= 0;
+        const fricheBad = surplus > 0 && budgetFricheNet < 0;
         if (amtFriche) {
-            amtFriche.textContent      = surplus > 0 ? fmt(budgetFriche) : '—';
-            amtFriche.style.background = surplus > 0 ? '#f0eff9' : '#f1f5f9';
-            amtFriche.style.color      = surplus > 0 ? '#5a54a3' : '#94a3b8';
+            amtFriche.textContent      = surplus > 0 ? fmt(Math.abs(budgetFricheNet)) : '—';
+            amtFriche.style.background = fricheOk ? '#f0eff9' : fricheBad ? '#fee2e2' : '#f1f5f9';
+            amtFriche.style.color      = fricheOk ? '#5a54a3' : fricheBad ? '#b91c1c' : '#94a3b8';
         }
         const assocOk  = surplus > 0 && budgetAssocNet >= 0;
         const assocBad = surplus > 0 && budgetAssocNet < 0;
@@ -1355,7 +1648,7 @@
         }
         const labelFriche = document.getElementById('bc-surplus-friche-pct');
         const labelAssoc  = document.getElementById('bc-surplus-assoc-pct');
-        if (labelFriche) labelFriche.style.color = surplus > 0 ? '#5a54a3' : '#94a3b8';
+        if (labelFriche) labelFriche.style.color = fricheOk ? '#5a54a3' : fricheBad ? '#b91c1c' : '#94a3b8';
         if (labelAssoc)  labelAssoc.style.color  = assocOk ? '#596F62' : assocBad ? '#b91c1c' : '#94a3b8';
 
         // Fil d'ariane — états (ok ou danger, pas de bleu intermédiaire)
@@ -1369,10 +1662,12 @@
     // —— Donut ——
     function mettreAJourDonut() {
         const inp = getInputs();
-        const { revenus, totalTerre, totalAmenag, surplus, budgetAssoc, budgetAssocNet, budgetFriche } = calculer(inp.nbLots, inp);
-        const cheminFin  = Math.min(budgetAssoc, inp.chemin);
-        const resteAssoc = Math.max(0, budgetAssocNet);
-        const manque     = Math.max(0, inp.chemin - budgetAssoc);
+        const { revenus, totalTerre, totalAmenag, surplus, budgetAssoc, budgetAssocNet, budgetFriche, budgetFricheNet } = calculer(inp.nbLots, inp);
+        const payeurBudget = inp.cheminPayePar === 'friche' ? budgetFriche : budgetAssoc;
+        const cheminFin  = Math.min(payeurBudget, inp.chemin);
+        const resteAssoc  = Math.max(0, budgetAssocNet);
+        const resteFriche = Math.max(0, budgetFricheNet);
+        const manque     = Math.max(0, inp.chemin - payeurBudget);
 
         const labels = [], data = [], colors = [];
         if (surplus < 0) {
@@ -1382,18 +1677,24 @@
             if (totalTerre > 0)    { labels.push('Achat terre');  data.push(totalTerre);  colors.push(COLORS.terre);  }
             if (totalAmenag > 0)   { labels.push('Aménagement');  data.push(totalAmenag); colors.push(COLORS.amenag); }
             if (inp.autresCouts>0) { labels.push('Autres coûts'); data.push(inp.autresCouts); colors.push('#e9d5ff'); }
-            if (budgetFriche > 0)  { labels.push('FRICH (' + inp.partFRICHE + ' %)'); data.push(budgetFriche); colors.push('#7E78D2'); }
-            if (cheminFin > 0)     { labels.push(manque > 0 ? 'Vers chemin (partiel)' : 'Chemin'); data.push(cheminFin); colors.push(manque > 0 ? COLORS.cheminP : COLORS.chemin); }
-            if (resteAssoc > 0)    { labels.push('Surplus assoc.'); data.push(resteAssoc); colors.push(COLORS.surplus); }
+            if (inp.cheminPayePar === 'friche') {
+                if (resteFriche > 0) { labels.push('FRICH net (' + inp.partFRICHE + ' %)'); data.push(resteFriche); colors.push('#7E78D2'); }
+                if (cheminFin > 0)   { labels.push(manque > 0 ? 'Vers chemin (partiel)' : 'Chemin'); data.push(cheminFin); colors.push(manque > 0 ? COLORS.cheminP : COLORS.chemin); }
+                if (budgetAssoc > 0) { labels.push('Surplus assoc.'); data.push(budgetAssoc); colors.push(COLORS.surplus); }
+            } else {
+                if (budgetFriche > 0) { labels.push('FRICH (' + inp.partFRICHE + ' %)'); data.push(budgetFriche); colors.push('#7E78D2'); }
+                if (cheminFin > 0)    { labels.push(manque > 0 ? 'Vers chemin (partiel)' : 'Chemin'); data.push(cheminFin); colors.push(manque > 0 ? COLORS.cheminP : COLORS.chemin); }
+                if (resteAssoc > 0)   { labels.push('Surplus assoc.'); data.push(resteAssoc); colors.push(COLORS.surplus); }
+            }
         }
 
-        const pct = inp.chemin > 0 ? Math.min(100, Math.round(budgetAssoc / inp.chemin * 100)) : 0;
+        const pct = inp.chemin > 0 ? Math.min(100, Math.round(payeurBudget / inp.chemin * 100)) : 0;
         const cPct = document.getElementById('donutCenterPct');
         const cLbl = document.getElementById('donutCenterLabel');
-        if (surplus < 0)            { cPct.textContent = '⚠ '; cPct.style.color = '#dc2626'; cLbl.innerHTML = 'déficit'; }
-        else if (budgetAssoc === 0) { cPct.textContent = '0 %'; cPct.style.color = '#aaa'; cLbl.innerHTML = 'du chemin<br>financé'; }
-        else if (manque > 0)        { cPct.textContent = pct + ' %'; cPct.style.color = '#f97316'; cLbl.innerHTML = 'du chemin<br>financé'; }
-        else                        { cPct.textContent = '100 %'; cPct.style.color = '#16a34a'; cLbl.innerHTML = 'du chemin<br>financé'; }
+        if (surplus < 0)             { cPct.textContent = '⚠ '; cPct.style.color = '#dc2626'; cLbl.innerHTML = 'déficit'; }
+        else if (payeurBudget === 0) { cPct.textContent = '0 %'; cPct.style.color = '#aaa'; cLbl.innerHTML = 'du chemin<br>financé'; }
+        else if (manque > 0)         { cPct.textContent = pct + ' %'; cPct.style.color = '#f97316'; cLbl.innerHTML = 'du chemin<br>financé'; }
+        else                         { cPct.textContent = '100 %'; cPct.style.color = '#16a34a'; cLbl.innerHTML = 'du chemin<br>financé'; }
 
         if (donutChart) {
             donutChart.data.labels = labels;
@@ -1458,7 +1759,19 @@
             const el = document.getElementById(inputId);
             if (el) params.set(key, el.value);
         }
+        const toggle = document.getElementById('cheminPayeurToggle');
+        if (toggle) params.set('cheminPayePar', toggle.dataset.value || 'asso');
         return window.location.origin + window.location.pathname + '?' + params.toString();
+    }
+
+    function setCheminPayeur(payeur) {
+        const toggle = document.getElementById('cheminPayeurToggle');
+        if (!toggle) return;
+        toggle.dataset.value = payeur;
+        toggle.querySelectorAll('.seg-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.payeur === payeur);
+        });
+        mettreAJourTout();
     }
 
     // —— Détection de changements ——
@@ -1473,9 +1786,11 @@
             return;
         }
         const current = getCurrentValues();
-        const changed = Object.keys(_referenceValues).some(k =>
-            Number(_referenceValues[k]) !== Number(current[k])
-        );
+        const changed = Object.keys(_referenceValues).some(k => {
+            const ref = _referenceValues[k], cur = current[k];
+            if (typeof ref === 'string' || typeof cur === 'string') return String(ref) !== String(cur);
+            return Number(ref) !== Number(cur);
+        });
         if (changed) {
             btn.classList.remove('btn-icon-muted');
             btn.classList.add('btn-icon-changed');
@@ -1521,6 +1836,15 @@
                 ref[key] = Number(p.get(key));
             }
         }
+        const payeur = p.get('cheminPayePar') || 'asso';
+        const toggle = document.getElementById('cheminPayeurToggle');
+        if (toggle) {
+            toggle.dataset.value = payeur;
+            toggle.querySelectorAll('.seg-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.payeur === payeur);
+            });
+        }
+        ref.cheminPayePar = payeur;
         const nb = p.get('nbLots');
         if (nb) {
             document.getElementById('lotSlider').value = nb;
@@ -1698,6 +2022,8 @@
             const el = document.getElementById(inputId);
             if (el) vals[key] = Number(el.value);
         }
+        const toggle = document.getElementById('cheminPayeurToggle');
+        if (toggle) vals.cheminPayePar = toggle.dataset.value || 'asso';
         return vals;
     }
 
@@ -1770,11 +2096,19 @@
                 if (el) el.value = vals[key];
             }
         }
+        const payeur = vals.cheminPayePar || 'asso';
+        const toggle = document.getElementById('cheminPayeurToggle');
+        if (toggle) {
+            toggle.dataset.value = payeur;
+            toggle.querySelectorAll('.seg-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.payeur === payeur);
+            });
+        }
         if (vals.nbLots) {
             document.getElementById('lotSlider').value = vals.nbLots;
             document.getElementById('lotNumber').value = vals.nbLots;
         }
-        _referenceValues = { ...vals };
+        _referenceValues = { ...vals, cheminPayePar: payeur };
         mettreAJourTout();
     }
 
@@ -1794,35 +2128,201 @@
         }
     }
 
+    function getNbLotsFromEntry(entry) {
+        const v = getValeursScenario(entry);
+        return Number.isFinite(v.nbLots) ? v.nbLots : Infinity;
+    }
+
+    function getJournalTrie() {
+        return getJournal()
+            .map((entry, idx) => ({ entry, idx }))
+            .sort((a, b) => getNbLotsFromEntry(a.entry) - getNbLotsFromEntry(b.entry));
+    }
+
     function renderJournal() {
         const journal = getJournal();
-        const list  = document.getElementById('journalList');
-        const empty = document.getElementById('journalEmpty');
-        const count = document.getElementById('journalCount');
+        const tabs = document.getElementById('scenarioTabs');
 
-        count.textContent = journal.length;
-        empty.style.display = journal.length ? 'none' : 'block';
-        list.innerHTML = '';
+        if (!journal.length) {
+            tabs.innerHTML = '<div class="scenario-tabs-empty" id="scenarioTabsEmpty">Aucun scénario sauvegardé.</div>';
+            renderComparaison();
+            return;
+        }
 
-        journal.forEach((entry, idx) => {
-            const li = document.createElement('li');
-            li.className = 'journal-entry';
+        let html = '';
+        getJournalTrie().forEach(({ entry, idx }) => {
             const isActive = entry.id === _scenarioActifId;
             const starClass = entry.isDefault ? 'active' : 'inactive';
             const starChar  = entry.isDefault ? '⭐' : '☆';
-            const descHtml = entry.desc ? ' — <span class="journal-entry-desc-text">' + esc(entry.desc) + '</span>' : '';
-            li.innerHTML = `
-                <button class="star-btn ${starClass} admin-only" onclick="rendreDefaut(${idx})" title="Par défaut">${starChar}</button>
-                <div class="journal-entry-body">
-                    <a class="journal-entry-name${isActive ? ' active' : ''}" href="#" onclick="chargerScenario(${idx}); return false;">${esc(entry.nom)}</a>${descHtml}
-                    <div class="journal-entry-meta">${entry.date}</div>
-                </div>
-                <div class="journal-entry-actions">
-                    <button class="journal-btn-icon danger admin-only" onclick="supprimerScenario(${idx})" title="Supprimer">🗑</button>
+            const descHtml = entry.desc
+                ? `<span class="scenario-tab-desc">${esc(entry.desc)}</span>`
+                : '';
+            const titleAttr = esc((entry.desc ? entry.desc + ' — ' : '') + (entry.date || ''));
+            html += `
+                <div class="scenario-tab${isActive ? ' active' : ''}" title="${titleAttr}">
+                    <button class="scenario-tab-star ${starClass} admin-only" onclick="rendreDefaut(${idx})" title="Par défaut">${starChar}</button>
+                    <div class="scenario-tab-content">
+                        <a class="scenario-tab-name" href="#" onclick="chargerScenario(${idx}); return false;">${esc(entry.nom)}</a>
+                        ${descHtml}
+                    </div>
+                    <button class="scenario-tab-delete admin-only" onclick="supprimerScenario(${idx})" title="Supprimer">×</button>
                 </div>
             `;
-            list.appendChild(li);
         });
+        tabs.innerHTML = html;
+
+        renderComparaison();
+    }
+
+    // —— Tableau comparatif ——
+    const COMPARAISON_ROWS = [
+        { section: 'Revenus', theme: 'revenus' },
+        { key: 'prixLot',                label: "Valeur d'un lot",        unit: '$' },
+        { key: 'nbLots',                 label: 'Nombre de lots',         unit: ''  },
+        { key: 'prixDemiLot',            label: "Valeur d'un ½-lot",      unit: '$' },
+        { key: 'nbDemiLots',             label: 'Nombre de ½-lots',       unit: ''  },
+        { key: 'autresRevenus',          label: 'Autres revenus',         unit: '$' },
+        { section: 'Achat & Aménagement', theme: 'amenag' },
+        { key: 'coutTerre',              label: 'Coût de la terre',       unit: '$' },
+        { key: 'arpentage',              label: 'Arpentage',              unit: '$' },
+        { key: 'biologiste',             label: 'Biologiste',             unit: '$' },
+        { key: 'autresCoutsAmenagement', label: 'Autres coûts (aménag.)', unit: '$' },
+        { section: 'Partage', theme: 'partage' },
+        { key: 'partFRICHE',             label: 'Part FRICHE',            unit: '%' },
+        { key: 'partAssociation',        label: 'Part Association',       unit: '%' },
+        { section: 'Surplus', theme: 'surplus' },
+        { computed: 'surplus',           label: 'Surplus à partager',     unit: '$' },
+        { computed: 'budgetFriche',      label: 'Valeur FRICHE',          unit: '$' },
+        { computed: 'budgetAssoc',       label: 'Valeur Association',     unit: '$' },
+        { key: 'chemin',                 label: 'Coût du chemin',         unit: '$' },
+        { key: 'cheminPayePar',          label: 'Chemin payé par',        unit: 'text' },
+        { section: 'Budget FRICHE', theme: 'friche' },
+        { computed: 'budgetFriche',      label: 'Surplus reçu',           unit: '$' },
+        { computed: 'fricheChemin',      label: '− Chemin',               unit: '$' },
+        { computed: 'budgetFricheNet',   label: 'Solde FRICHE',           unit: '$' },
+        { section: 'Budget Association', theme: 'asso' },
+        { computed: 'budgetAssoc',       label: 'Surplus reçu',           unit: '$' },
+        { computed: 'assocChemin',       label: '− Chemin',               unit: '$' },
+        { key: 'autresCouts',            label: '− Autres coûts',         unit: '$' },
+        { computed: 'budgetAssocNet',    label: 'Solde Association',      unit: '$' },
+    ];
+
+    function getValeursScenario(entry) {
+        try {
+            const u = new URL(entry.url);
+            const p = u.searchParams;
+            const v = {};
+            for (const key of Object.keys(PARAM_MAP)) {
+                if (p.has(key)) v[key] = Number(p.get(key));
+            }
+            v.cheminPayePar = p.get('cheminPayePar') || 'asso';
+            return v;
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function getCalculsScenario(entry) {
+        const v = getValeursScenario(entry);
+        if (!Number.isFinite(v.nbLots)) return {};
+        const inp = {
+            prixLot: v.prixLot || 0,
+            nbLots: v.nbLots,
+            prixDemiLot: v.prixDemiLot || 0,
+            nbDemiLots: v.nbDemiLots || 0,
+            autresRevenus: v.autresRevenus || 0,
+            coutTerre: v.coutTerre || 0,
+            arpentage: v.arpentage || 0,
+            biologiste: v.biologiste || 0,
+            autresCoutsAmenagement: v.autresCoutsAmenagement || 0,
+            chemin: v.chemin || 0,
+            autresCouts: v.autresCouts || 0,
+            partFRICHE: v.partFRICHE || 0,
+            partAssoc: v.partAssociation || 0,
+            cheminPayePar: v.cheminPayePar || 'asso',
+        };
+        return calculer(v.nbLots, inp);
+    }
+
+    function formatComparVal(v, unit) {
+        if (v === undefined || v === null) return '—';
+        if (unit === 'text') {
+            if (v === 'asso') return 'Association';
+            if (v === 'friche') return 'FRICHE';
+            return String(v);
+        }
+        if (typeof v === 'number' && isNaN(v)) return '—';
+        if (unit === '$') return v.toLocaleString('fr-CA') + ' $';
+        if (unit === '%') return v + ' %';
+        return v.toLocaleString('fr-CA');
+    }
+
+    function renderComparaison() {
+        const journal = getJournal();
+        const empty   = document.getElementById('comparaisonEmpty');
+        const scroll  = document.getElementById('comparaisonScroll');
+        const head    = document.getElementById('comparaisonHead');
+        const body    = document.getElementById('comparaisonBodyRows');
+        const count   = document.getElementById('comparaisonCount');
+
+        count.textContent = journal.length;
+
+        if (!journal.length) {
+            empty.style.display = 'block';
+            scroll.style.display = 'none';
+            head.innerHTML = '';
+            body.innerHTML = '';
+            return;
+        }
+        empty.style.display = 'none';
+        scroll.style.display = '';
+
+        const trie = getJournalTrie();
+        const valsByScen = trie.map(({ entry }) => getValeursScenario(entry));
+        const calcsByScen = trie.map(({ entry }) => getCalculsScenario(entry));
+
+        let headHtml = '<th class="col-label">Paramètre</th>';
+        trie.forEach(({ entry, idx }) => {
+            const isActive = entry.id === _scenarioActifId;
+            const star = entry.isDefault ? '<span class="scen-default">⭐</span>' : '';
+            headHtml += `<th class="${isActive ? 'col-active' : ''}">${star}<a class="comparaison-scen-link${isActive ? ' active' : ''}" href="#" onclick="chargerScenario(${idx}); return false;">${esc(entry.nom)}</a></th>`;
+        });
+        head.innerHTML = headHtml;
+
+        let bodyHtml = '';
+
+        // Ligne description
+        bodyHtml += '<tr class="row-desc"><td class="col-label">Description</td>';
+        trie.forEach(({ entry }) => {
+            const isActive = entry.id === _scenarioActifId;
+            const desc = entry.desc ? esc(entry.desc) : '<span style="color:#cbd5e1;">—</span>';
+            bodyHtml += `<td class="${isActive ? 'col-active' : ''}">${desc}</td>`;
+        });
+        bodyHtml += '</tr>';
+
+        let currentTheme = '';
+        for (const row of COMPARAISON_ROWS) {
+            if (row.section) {
+                currentTheme = row.theme || '';
+                const themeCls = currentTheme ? ' theme-' + currentTheme : '';
+                bodyHtml += `<tr class="row-section${themeCls}"><td colspan="${journal.length + 1}">${esc(row.section)}</td></tr>`;
+                continue;
+            }
+            const classes = [];
+            if (currentTheme) classes.push('theme-' + currentTheme);
+            if (row.computed) classes.push('row-computed');
+            const trCls = classes.length ? ` class="${classes.join(' ')}"` : '';
+            bodyHtml += `<tr${trCls}><td class="col-label">${esc(row.label)}</td>`;
+            trie.forEach(({ entry }, sortedIdx) => {
+                const isActive = entry.id === _scenarioActifId;
+                const v = row.computed
+                    ? calcsByScen[sortedIdx][row.computed]
+                    : valsByScen[sortedIdx][row.key];
+                bodyHtml += `<td class="${isActive ? 'col-active' : ''}">${formatComparVal(v, row.unit)}</td>`;
+            });
+            bodyHtml += '</tr>';
+        }
+        body.innerHTML = bodyHtml;
     }
 
     function esc(s) {
@@ -1936,6 +2436,14 @@
     document.getElementById('partAssociation').value          = CONFIG.partAssociation;
     document.getElementById('lotSlider').value                = CONFIG.nbLots;
     document.getElementById('lotNumber').value                = CONFIG.nbLots;
+    (() => {
+        const t = document.getElementById('cheminPayeurToggle');
+        if (!t) return;
+        t.dataset.value = CONFIG.cheminPayePar || 'asso';
+        t.querySelectorAll('.seg-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.payeur === t.dataset.value);
+        });
+    })();
 
     // —— Prevent negative values ——
     document.querySelectorAll('input[type="number"][min="0"]').forEach(el => {
